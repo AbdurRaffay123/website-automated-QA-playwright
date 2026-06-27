@@ -1,0 +1,81 @@
+{
+  "projectName": "anil-inventory-erp",
+  "baseUrl": "http://localhost:8000",
+  "frontendUrl": "http://localhost:5173",
+
+  "auth": {
+    "type": "bearer-login",
+    "loginEndpoint": "/api/login",
+    "loginMethod": "POST",
+    "loginBody": {
+      "email": "test@example.com",
+      "password": "password"
+    },
+    "tokenPath": "data.token",
+    "header": "Authorization",
+    "headerPrefix": "Bearer "
+  },
+
+  "endpoints": [
+    { "name": "Login", "method": "POST", "path": "/api/login", "auth": false,
+      "body": { "email": "test@example.com", "password": "password" },
+      "expectStatus": [200] },
+
+    { "name": "Get current user", "method": "GET", "path": "/api/me", "auth": true, "expectStatus": [200] },
+
+    { "name": "List CRM contacts", "method": "GET", "path": "/api/crm/contacts", "auth": true, "expectStatus": [200] },
+    { "name": "Create CRM contact", "method": "POST", "path": "/api/crm/contacts", "auth": true,
+      "body": { "firstName": "Test", "lastName": "Tester", "email": "tester@example.com" },
+      "expectStatus": [200, 201],
+      "saveResponseField": { "as": "createdContactUuid", "path": "data.uuid" } },
+    { "name": "Get created CRM contact", "method": "GET", "path": "/api/crm/contacts/{{createdContactUuid}}", "auth": true, "expectStatus": [200] },
+    { "name": "Update created CRM contact", "method": "PUT", "path": "/api/crm/contacts/{{createdContactUuid}}", "auth": true,
+      "body": { "firstName": "TestUpdated" },
+      "expectStatus": [200] },
+    { "name": "Delete created CRM contact", "method": "DELETE", "path": "/api/crm/contacts/{{createdContactUuid}}", "auth": true, "expectStatus": [200, 204] },
+
+    { "name": "List CRM companies", "method": "GET", "path": "/api/crm/companies", "auth": true, "expectStatus": [200] },
+    { "name": "List articles", "method": "GET", "path": "/api/articles/items", "auth": true, "expectStatus": [200] },
+    { "name": "List sales quotations", "method": "GET", "path": "/api/sales/quotations", "auth": true, "expectStatus": [200] },
+    { "name": "List sales orders", "method": "GET", "path": "/api/sales/orders", "auth": true, "expectStatus": [200] },
+    { "name": "List sales invoices (backend-only per audit)", "method": "GET", "path": "/api/sales/invoices", "auth": true, "expectStatus": [200] },
+    { "name": "List purchase orders", "method": "GET", "path": "/api/purchases/orders", "auth": true, "expectStatus": [200] },
+    { "name": "List warehouses", "method": "GET", "path": "/api/warehouse/warehouses", "auth": true, "expectStatus": [200] },
+    { "name": "Dashboard stats", "method": "GET", "path": "/api/dashboard/stats", "auth": true, "expectStatus": [200] },
+
+    { "name": "CRM import status (known stub)", "method": "GET", "path": "/api/crm/import/status/test-job-id", "auth": true, "expectStatus": [200, 404], "knownIssue": "Audit flags import persistence/status as stubbed" }
+  ],
+
+  "pages": [
+    { "name": "Login", "path": "/login", "requiresAuth": false,
+      "expectSelector": "form" },
+
+    { "name": "Dashboard", "path": "/dashboard", "requiresAuth": true,
+      "expectSelector": "body",
+      "knownIssue": "Audit flags this as static/mock widget data" },
+
+    { "name": "CRM Contacts", "path": "/crm/contacts", "requiresAuth": true, "expectSelector": "table, [role=table]" },
+    { "name": "CRM Leads", "path": "/crm/leads", "requiresAuth": true, "expectSelector": "table, [role=table]" },
+    { "name": "CRM Customers", "path": "/crm/customers", "requiresAuth": true, "expectSelector": "table, [role=table]" },
+    { "name": "CRM Suppliers", "path": "/crm/suppliers", "requiresAuth": true, "expectSelector": "table, [role=table]" },
+
+    { "name": "Articles - Items", "path": "/articles/items", "requiresAuth": true, "expectSelector": "table, [role=table]" },
+    { "name": "Articles - Variant Articles (placeholder per audit)", "path": "/articles/variant-articles", "requiresAuth": true, "expectSelector": "body",
+      "knownIssue": "Audit flags this as placeholder/local-only" },
+
+    { "name": "Sales Quotations", "path": "/sales/quotations", "requiresAuth": true, "expectSelector": "table, [role=table]" },
+    { "name": "Sales Orders", "path": "/sales/orders", "requiresAuth": true, "expectSelector": "table, [role=table]" },
+    { "name": "Sales Shipments", "path": "/sales/shipments", "requiresAuth": true, "expectSelector": "table, [role=table]" },
+    { "name": "Sales Invoices (no router entry per audit)", "path": "/sales/invoices", "requiresAuth": true, "expectSelector": "body",
+      "knownIssue": "Audit flags no router entry - expect fallthrough to dashboard" },
+
+    { "name": "Purchase Orders", "path": "/purchases/orders", "requiresAuth": true, "expectSelector": "table, [role=table]" },
+    { "name": "Warehouse Stock Movements", "path": "/warehouse/stock-movements", "requiresAuth": true, "expectSelector": "table, [role=table]" },
+    { "name": "Warehouse Stock Levels (mock per audit)", "path": "/warehouse/stock-levels", "requiresAuth": true, "expectSelector": "body",
+      "knownIssue": "Audit flags mock table/tree data" }
+  ],
+
+  "buttonChecks": [
+    { "pageName": "CRM Contacts", "buttonText": "Add", "expectAction": "opens-modal-or-navigates" }
+  ]
+}
