@@ -1,9 +1,10 @@
 import fs from 'fs';
 import path from 'path';
+import { resolveTemplate, getByPath } from '../helpers/template.js';
 
 /**
- * Loads a project config file by name (without .json extension) or full path.
- * Usage: PROJECT=anil-erp npm run test
+ * Loads and normalizes a project config file.
+ * Usage: PROJECT=anil-erp npx playwright test
  */
 export function loadConfig() {
   const projectName = process.env.PROJECT;
@@ -23,41 +24,63 @@ export function loadConfig() {
 
   const raw = fs.readFileSync(configPath, 'utf-8');
   const config = JSON.parse(raw);
+  return normalizeConfig(config, projectName);
+}
 
-  // basic validation
+function normalizeConfig(config, projectName) {
   if (!config.baseUrl) throw new Error(`Config "${projectName}" is missing baseUrl`);
-  if (!Array.isArray(config.endpoints)) config.endpoints = [];
-  if (!Array.isArray(config.pages)) config.pages = [];
+
+  // Legacy arrays — always present with defaults
+  config.endpoints = config.endpoints || [];
+  config.pages = config.pages || [];
+  config.buttonChecks = config.buttonChecks || [];
+  config.cleanupTargets = config.cleanupTargets || [];
+
+  // New capability sections — optional, default to empty
+  config.modules = config.modules || [];
+  config.workflows = config.workflows || [];
+  config.forms = config.forms || [];
+  config.validations = config.validations || [];
+  config.tables = config.tables || [];
+  config.navigation = config.navigation || {};
+  config.roles = config.roles || [];
+  config.responsive = config.responsive || {};
+  config.performance = config.performance || {};
+  config.visual = config.visual || {};
+  config.files = config.files || [];
+  config.notifications = config.notifications || [];
+  config.search = config.search || [];
+  config.dashboards = config.dashboards || [];
+  config.accessibility = config.accessibility || {};
+  config.links = config.links || {};
+  config.persistence = config.persistence || [];
+  config.plugins = config.plugins || {};
+  config.hooks = config.hooks || {};
+  config.tags = config.tags || [];
+  config.retry = config.retry || {};
+
+  // Default responsive breakpoints
+  if (!config.responsive.breakpoints) {
+    config.responsive.breakpoints = {
+      desktop: { width: 1920, height: 1080 },
+      laptop: { width: 1366, height: 768 },
+      tablet: { width: 768, height: 1024 },
+      mobile: { width: 375, height: 812 },
+    };
+  }
+
+  // Default performance thresholds
+  if (!config.performance.thresholds) {
+    config.performance.thresholds = {
+      pageLoadMs: 5000,
+      apiResponseMs: 2000,
+      jsBundleBytes: 2097152,
+      imageBytes: 512000,
+    };
+  }
 
   return config;
 }
 
-/**
- * Resolve {{placeholders}} in a string/object using a context map.
- * Lets later steps reference values saved by earlier steps (e.g. a created record's UUID).
- */
-export function resolveTemplate(value, context) {
-  if (typeof value === 'string') {
-    return value.replace(/\{\{(.*?)\}\}/g, (_, key) => {
-      const trimmed = key.trim();
-      if (!(trimmed in context)) {
-        throw new Error(`Template variable "${trimmed}" was not found in context. Did an earlier step fail to save it?`);
-      }
-      return context[trimmed];
-    });
-  }
-  if (Array.isArray(value)) {
-    return value.map((v) => resolveTemplate(v, context));
-  }
-  if (value && typeof value === 'object') {
-    const out = {};
-    for (const [k, v] of Object.entries(value)) out[k] = resolveTemplate(v, context);
-    return out;
-  }
-  return value;
-}
-
-/** Reads a dotted path like "data.token" out of a JSON object */
-export function getByPath(obj, dottedPath) {
-  return dottedPath.split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
-}
+// Re-export for backward compatibility
+export { resolveTemplate, getByPath } from '../helpers/template.js';

@@ -1,17 +1,24 @@
 {
   "name": "site-tester",
-  "version": "1.0.0",
-  "description": "Config-driven smoke/regression tester for web apps - checks pages, buttons, and all 4 API methods (GET/POST/PUT/DELETE)",
+  "version": "2.0.0",
+  "description": "Config-driven QA automation platform for ERP and web applications",
   "type": "module",
   "scripts": {
-    "test": "playwright test",
+    "test": "playwright test tests/suite.spec.js",
+    "test:suite": "playwright test tests/suite.spec.js",
     "test:api": "playwright test api-tests",
     "test:ui": "playwright test ui-tests",
     "test:project": "node core/run.js",
+    "test:smoke": "node core/run.js --tags smoke",
+    "test:crud": "node core/run.js --plugins workflows,persistence,forms",
+    "test:all-browsers": "BROWSERS=chromium,firefox,webkit node core/run.js",
+    "test:update-snapshots": "playwright test --update-snapshots",
     "cleanup": "node core/cleanupCli.js",
-    "report": "playwright show-report reports/html"
+    "report": "playwright show-report reports/html",
+    "report:qa": "open reports/qa/qa-report.html"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
     "@playwright/test": "^1.48.0"
   },
   "dependencies": {

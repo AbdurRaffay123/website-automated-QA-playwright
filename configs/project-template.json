@@ -1,0 +1,541 @@
+{
+  "projectName": "example-erp",
+  "baseUrl": "http://localhost:8000",
+  "frontendUrl": "http://localhost:5173",
+  "workers": 1,
+  "timeout": 60000,
+  "retries": 0,
+
+  "auth": {
+    "type": "bearer-login",
+    "loginEndpoint": "/api/login",
+    "loginBody": { "email": "qa@example.com", "password": "password" },
+    "tokenPath": "data.access_token",
+    "header": "Authorization",
+    "headerPrefix": "Bearer "
+  },
+
+  "uiLogin": {
+    "path": "/login",
+    "usernameSelector": "input[type=\"email\"]",
+    "passwordSelector": "input[type=\"password\"]",
+    "submitSelector": "button[type=\"submit\"]",
+    "username": "qa@example.com",
+    "password": "password",
+    "successUrlPattern": "**/dashboard"
+  },
+
+  "uiLogout": {
+    "selector": "[data-testid=\"logout\"]",
+    "successUrlPattern": "**/login"
+  },
+
+  "variables": {
+    "companyName": "QA Test Company"
+  },
+
+  "hooks": {
+    "beforeAll": [],
+    "afterAll": ["cleanup"]
+  },
+
+  "retry": {
+    "maxRetries": 2,
+    "delayMs": 1000,
+    "transientOnly": true
+  },
+
+  "plugins": {
+    "api": true,
+    "ui": true,
+    "workflows": true,
+    "forms": true,
+    "validators": true,
+    "tables": true,
+    "navigation": true,
+    "uiHealth": true,
+    "network": true,
+    "performance": true,
+    "visual": false,
+    "responsive": true,
+    "roles": true,
+    "files": true,
+    "notifications": true,
+    "search": true,
+    "dashboard": true,
+    "accessibility": true,
+    "links": true,
+    "persistence": true,
+    "testData": true
+  },
+
+  "modules": [
+    { "name": "customers", "path": "/customers", "apiPath": "/api/customers" },
+    { "name": "products", "path": "/products", "apiPath": "/api/products" }
+  ],
+
+  "endpoints": [
+    {
+      "name": "Auth login",
+      "method": "POST",
+      "path": "/api/login",
+      "auth": false,
+      "body": { "email": "qa@example.com", "password": "password" },
+      "expectStatus": [200]
+    },
+    {
+      "name": "List customers",
+      "method": "GET",
+      "path": "/api/customers",
+      "auth": true,
+      "expectStatus": [200]
+    }
+  ],
+
+  "pages": [
+    {
+      "name": "Dashboard",
+      "path": "/dashboard",
+      "requiresAuth": true,
+      "expectSelector": "[data-testid=\"dashboard\"]",
+      "tags": ["smoke"]
+    },
+    {
+      "name": "Customers list",
+      "path": "/customers",
+      "requiresAuth": true,
+      "expectSelector": "table, [data-testid=\"customers-list\"]"
+    }
+  ],
+
+  "workflows": [
+    {
+      "name": "Customer CRUD",
+      "module": "customers",
+      "tags": ["crud", "smoke"],
+      "priority": 1,
+      "requiresAuth": true,
+      "steps": [
+        {
+          "action": "api",
+          "method": "POST",
+          "path": "/api/customers",
+          "body": {
+            "name": "{{unique:name}}",
+            "email": "{{unique:email}}"
+          },
+          "expectStatus": [200, 201],
+          "saveAs": "customerId",
+          "savePath": "data.uuid",
+          "trackRecord": "customer"
+        },
+        {
+          "action": "api",
+          "method": "GET",
+          "path": "/api/customers/{{customerId}}",
+          "expectStatus": [200],
+          "expectResponseContains": { "data.name": "{{unique:name}}" }
+        },
+        {
+          "action": "ui",
+          "path": "/customers/{{customerId}}",
+          "expectSelector": "[data-testid=\"customer-details\"]"
+        },
+        {
+          "action": "api",
+          "method": "PUT",
+          "path": "/api/customers/{{customerId}}",
+          "body": { "name": "Updated {{runTag}}" },
+          "expectStatus": [200]
+        },
+        {
+          "action": "search",
+          "inputSelector": "[data-testid=\"search-input\"]",
+          "query": "Updated {{runTag}}",
+          "resultsSelector": "tbody",
+          "expectContains": "Updated"
+        },
+        {
+          "action": "api",
+          "method": "DELETE",
+          "path": "/api/customers/{{customerId}}",
+          "expectStatus": [200, 204]
+        },
+        {
+          "action": "api",
+          "method": "GET",
+          "path": "/api/customers/{{customerId}}",
+          "expectStatus": [404]
+        }
+      ],
+      "afterEach": []
+    }
+  ],
+
+  "forms": [
+    {
+      "name": "Create customer form",
+      "path": "/customers/new",
+      "requiresAuth": true,
+      "fields": [
+        { "name": "name", "type": "text", "selector": "#name", "value": "{{unique:name}}" },
+        { "name": "email", "type": "email", "selector": "#email", "value": "{{unique:email}}" },
+        { "name": "status", "type": "select", "selector": "#status", "value": "active" },
+        { "name": "notes", "type": "textarea", "selector": "#notes", "value": "QA test notes" },
+        { "name": "newsletter", "type": "checkbox", "selector": "#newsletter", "value": true }
+      ],
+      "submitSelector": "button[type=\"submit\"]",
+      "expectNotification": {
+        "selector": ".toast-success, [role=\"alert\"]",
+        "text": "created",
+        "type": "success"
+      },
+      "expectRedirect": "**/customers/*",
+      "verifyPersistence": true,
+      "detailsPath": "/customers/{{customerId}}",
+      "tags": ["forms"]
+    }
+  ],
+
+  "validations": [
+    {
+      "name": "Customer form validation",
+      "path": "/customers/new",
+      "requiresAuth": true,
+      "fieldSelector": "#email",
+      "submitSelector": "button[type=\"submit\"]",
+      "errorSelector": ".error, [role=\"alert\"]",
+      "fields": [
+        { "name": "name", "type": "text", "selector": "#name", "value": "Test" }
+      ],
+      "rules": [
+        { "type": "required", "field": { "selector": "#email", "type": "email" }, "expectMessage": "required" },
+        { "type": "invalidEmail", "field": { "selector": "#email", "type": "email" }, "value": "bad-email", "expectMessage": "valid email" }
+      ],
+      "tags": ["validation"]
+    }
+  ],
+
+  "tables": [
+    {
+      "name": "Customers table",
+      "path": "/customers",
+      "requiresAuth": true,
+      "selector": "table",
+      "rowSelector": "tbody tr",
+      "search": {
+        "inputSelector": "[data-testid=\"search-input\"]",
+        "query": "test",
+        "expectContains": "test"
+      },
+      "sorting": [
+        { "columnSelector": "th[data-column=\"name\"]", "cellSelector": "td:first-child" }
+      ],
+      "pagination": {
+        "nextSelector": "[aria-label=\"Next page\"]",
+        "prevSelector": "[aria-label=\"Previous page\"]"
+      },
+      "tags": ["tables"]
+    }
+  ],
+
+  "navigation": {
+    "requiresAuth": true,
+    "startPath": "/dashboard",
+    "menus": [
+      { "name": "Customers", "selector": "a[href=\"/customers\"]", "expectPath": "**/customers" },
+      { "name": "Products", "selector": "a[href=\"/products\"]", "expectPath": "**/products" }
+    ],
+    "tabs": [
+      {
+        "name": "Customer detail tabs",
+        "path": "/customers/{{customerId}}",
+        "items": [
+          { "selector": "[data-tab=\"overview\"]", "expectSelector": "[data-panel=\"overview\"]" },
+          { "selector": "[data-tab=\"orders\"]", "expectSelector": "[data-panel=\"orders\"]" }
+        ]
+      }
+    ],
+    "breadcrumbs": {
+      "path": "/customers/{{customerId}}",
+      "selector": "nav[aria-label=\"breadcrumb\"] a, .breadcrumb a",
+      "expectMinItems": 2
+    },
+    "deepLinks": [
+      { "name": "Customer detail", "path": "/customers/{{customerId}}", "expectSelector": "[data-testid=\"customer-details\"]" },
+      { "name": "404 page", "path": "/nonexistent-page-xyz", "expect404": true }
+    ],
+    "backForward": {
+      "startPath": "/dashboard",
+      "navigateTo": "/customers"
+    },
+    "tags": ["navigation"]
+  },
+
+  "roles": [
+    {
+      "name": "Admin",
+      "email": "admin@example.com",
+      "password": "password",
+      "accessiblePages": [
+        { "name": "Settings", "path": "/settings", "expectSelector": "[data-testid=\"settings\"]" }
+      ],
+      "hiddenPages": [
+        { "name": "Admin-only", "path": "/admin/internal", "expectSelector": "[data-testid=\"admin-panel\"]" }
+      ],
+      "forbiddenActions": [
+        { "name": "Delete all", "path": "/customers", "selector": "[data-action=\"delete-all\"]" }
+      ],
+      "tags": ["roles"]
+    },
+    {
+      "name": "Sales",
+      "email": "sales@example.com",
+      "password": "password",
+      "accessiblePages": [
+        { "name": "Customers", "path": "/customers" }
+      ],
+      "hiddenPages": [
+        { "name": "Settings", "path": "/settings" }
+      ],
+      "tags": ["roles"]
+    }
+  ],
+
+  "search": [
+    {
+      "name": "Customer search",
+      "path": "/customers",
+      "requiresAuth": true,
+      "inputSelector": "[data-testid=\"search-input\"]",
+      "resultsSelector": "tbody",
+      "rowSelector": "tbody tr",
+      "queries": [
+        { "query": "test", "expectContains": "test" },
+        { "query": "xyznonexistent123", "expectEmpty": true }
+      ],
+      "tags": ["search"]
+    }
+  ],
+
+  "dashboards": [
+    {
+      "name": "Main dashboard",
+      "path": "/dashboard",
+      "requiresAuth": true,
+      "widgets": [
+        { "name": "Revenue", "selector": "[data-widget=\"revenue\"]", "expectMinValue": 0 },
+        { "name": "Orders", "selector": "[data-widget=\"orders\"]" }
+      ],
+      "kpis": [
+        { "name": "Total customers", "selector": "[data-kpi=\"customers\"]", "expectPattern": "\\d+" }
+      ],
+      "charts": [
+        { "name": "Sales chart", "selector": "canvas, svg.recharts-surface, [data-chart]", "expectData": true }
+      ],
+      "cards": [
+        { "selector": "[data-card=\"recent-orders\"]" }
+      ],
+      "tags": ["dashboard"]
+    }
+  ],
+
+  "files": [
+    {
+      "name": "Customer document upload",
+      "path": "/customers/{{customerId}}/documents",
+      "requiresAuth": true,
+      "upload": {
+        "inputSelector": "input[type=\"file\"]",
+        "filePath": "test-assets/sample.pdf",
+        "content": "%PDF-1.4 QA test file",
+        "submitSelector": "button[type=\"submit\"]",
+        "expectSuccess": true,
+        "successSelector": ".upload-success"
+      },
+      "invalidUpload": {
+        "inputSelector": "input[type=\"file\"]",
+        "filePath": "test-assets/invalid.exe",
+        "errorSelector": ".error"
+      },
+      "download": {
+        "triggerSelector": "[data-action=\"download\"]",
+        "expectExtension": "pdf"
+      },
+      "tags": ["files"]
+    }
+  ],
+
+  "notifications": [
+    {
+      "name": "Delete confirmation",
+      "path": "/customers",
+      "requiresAuth": true,
+      "type": "confirm",
+      "triggerSelector": "[data-action=\"delete\"]:first-child",
+      "selector": "[role=\"alertdialog\"]",
+      "confirmSelector": "button:has-text(\"Confirm\")",
+      "tags": ["notifications"]
+    }
+  ],
+
+  "persistence": [
+    {
+      "name": "Customer data persistence",
+      "idVariable": "customerId",
+      "create": {
+        "method": "POST",
+        "path": "/api/customers",
+        "body": { "name": "{{unique:name}}", "email": "{{unique:email}}" },
+        "saveAs": "customerId",
+        "savePath": "data.uuid"
+      },
+      "listingPage": {
+        "path": "/customers",
+        "searchInput": "[data-testid=\"search-input\"]",
+        "searchQuery": "{{unique:name}}",
+        "expectContains": "{{unique:name}}"
+      },
+      "detailsPage": {
+        "path": "/customers/{{customerId}}",
+        "expectFields": [
+          { "selector": "[data-field=\"name\"]", "value": "{{unique:name}}" }
+        ]
+      },
+      "editPage": {
+        "path": "/customers/{{customerId}}/edit",
+        "expectFields": [
+          { "selector": "#name", "value": "{{unique:name}}" }
+        ]
+      },
+      "apiVerify": {
+        "path": "/api/customers/{{customerId}}",
+        "expectFields": { "data.name": "{{unique:name}}" }
+      },
+      "afterRefresh": true,
+      "afterRelogin": true,
+      "tags": ["persistence"]
+    }
+  ],
+
+  "network": {
+    "ignoreErrors": ["/analytics", "/tracking"],
+    "actions": [
+      {
+        "name": "Customer list API call",
+        "path": "/customers",
+        "requiresAuth": true,
+        "expectRequest": {
+          "method": "GET",
+          "urlPattern": "/api/customers",
+          "expectStatus": [200]
+        },
+        "expectNoErrors": true
+      }
+    ],
+    "monitorPages": [
+      { "name": "Dashboard network health", "path": "/dashboard", "requiresAuth": true }
+    ]
+  },
+
+  "performance": {
+    "enabled": true,
+    "failOnSlow": false,
+    "thresholds": {
+      "pageLoadMs": 5000,
+      "apiResponseMs": 2000,
+      "jsBundleBytes": 2097152,
+      "imageBytes": 512000
+    },
+    "pages": [
+      { "name": "Dashboard", "path": "/dashboard", "requiresAuth": true }
+    ]
+  },
+
+  "visual": {
+    "enabled": false,
+    "updateBaselines": false,
+    "maxDiffPixels": 100,
+    "threshold": 0.2,
+    "baselineDir": "baselines",
+    "screenshots": [
+      {
+        "name": "Dashboard",
+        "path": "/dashboard",
+        "requiresAuth": true,
+        "fullPage": true,
+        "waitForSelector": "[data-testid=\"dashboard\"]",
+        "mask": [".timestamp", "[data-dynamic]"]
+      }
+    ]
+  },
+
+  "responsive": {
+    "enabled": true,
+    "checkHorizontalScroll": true,
+    "breakpoints": {
+      "desktop": { "width": 1920, "height": 1080 },
+      "laptop": { "width": 1366, "height": 768 },
+      "tablet": { "width": 768, "height": 1024 },
+      "mobile": { "width": 375, "height": 812 }
+    },
+    "pages": [
+      { "name": "Dashboard", "path": "/dashboard", "requiresAuth": true }
+    ]
+  },
+
+  "accessibility": {
+    "enabled": true,
+    "failOnViolations": false,
+    "ignoreRules": ["color-contrast"],
+    "checkKeyboardNav": true,
+    "pages": [
+      { "name": "Dashboard", "path": "/dashboard", "requiresAuth": true }
+    ]
+  },
+
+  "links": {
+    "enabled": true,
+    "failOnBroken": false,
+    "maxLinksPerPage": 30,
+    "pages": [
+      { "name": "Dashboard", "path": "/dashboard", "requiresAuth": true }
+    ]
+  },
+
+  "uiHealth": {
+    "enabled": true,
+    "failOn": ["blank-page", "js-errors"],
+    "allowSpinners": false,
+    "checkOverlap": false
+  },
+
+  "testData": {
+    "cleanupAfterRun": true,
+    "factories": [
+      {
+        "name": "customer",
+        "create": {
+          "method": "POST",
+          "path": "/api/customers",
+          "body": { "name": "{{unique:name}}", "email": "{{unique:email}}" },
+          "saveAs": "customerId",
+          "savePath": "data.uuid"
+        }
+      }
+    ]
+  },
+
+  "cleanupTargets": [
+    {
+      "name": "Customers",
+      "listEndpoint": "/api/customers",
+      "listResponsePath": "data",
+      "matchField": "email",
+      "idField": "uuid",
+      "deleteEndpointTemplate": "/api/customers/{{id}}"
+    }
+  ],
+
+  "buttonChecks": []
+}

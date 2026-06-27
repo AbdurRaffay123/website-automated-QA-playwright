@@ -1,70 +1,277 @@
-# site-tester
+# QA Automation Platform
 
-A reusable, config-driven smoke/regression tester. Point it at any project by writing one config file —
-no test code changes needed. Checks:
+A config-driven, plugin-based QA automation framework for validating entire ERP systems before production deployment. Point it at any project with a single JSON config — no project-specific test code required.
 
-- **API**: every endpoint across GET/POST/PUT/DELETE, with auth, and chaining (e.g. create a record, then read/update/delete that exact record using its returned ID)
-- **UI**: every page loads (no 404s, no blank screens, no console errors), plus optional button-click checks
+```bash
+PROJECT=my-erp npx playwright test
+```
 
-## Setup
+## Capabilities
+
+| # | Feature | Config Section | Plugin |
+|---|---------|----------------|--------|
+| 1 | CRUD workflow testing | `workflows[]` | workflows |
+| 2 | Form testing (all input types) | `forms[]` | forms |
+| 3 | Validation rule testing | `validations[]` | validators |
+| 4 | Table/grid testing | `tables[]` | tables |
+| 5 | Data persistence verification | `persistence[]` | persistence |
+| 6 | Navigation testing | `navigation` | navigation |
+| 7 | UI health checks | `uiHealth` | uiHealth |
+| 8 | Network verification | `network` | network |
+| 9 | Performance checks | `performance` | performance |
+| 10 | Visual regression | `visual` | visual |
+| 11 | Responsive testing | `responsive` | responsive |
+| 12 | Role-based testing | `roles[]` | roles |
+| 13 | Multi-browser support | `BROWSERS` env | playwright projects |
+| 14 | File upload/download | `files[]` | files |
+| 15 | Notifications/modals | `notifications[]` | notifications |
+| 16 | Search testing | `search[]` | search |
+| 17 | Dashboard testing | `dashboards[]` | dashboard |
+| 18 | HTML report generation | automatic | qaReporter |
+| 19 | Evidence collection | automatic on failure | evidence helper |
+| 20 | Retry strategy | `retry` | retry |
+| 21 | Test data management | `testData`, `cleanupTargets` | testData |
+| 22 | Accessibility scans | `accessibility` | accessibility |
+| 23 | Link checking | `links` | links |
+| 24 | Extended JSON config | all sections | config |
+| 25 | Plugin architecture | `plugins` | pluginRegistry |
+| — | API smoke tests (legacy) | `endpoints[]` | api |
+| — | UI page smoke tests (legacy) | `pages[]` | ui |
+
+## Quick Start
 
 ```bash
 npm install
 npx playwright install --with-deps chromium
+
+# Run full suite
+PROJECT=anil-erp npx playwright test
+
+# Run specific plugins
+PLUGINS=api,ui,workflows PROJECT=anil-erp npx playwright test
+
+# Run smoke-tagged tests only
+TAGS=smoke PROJECT=anil-erp npx playwright test
+
+# All browsers
+BROWSERS=chromium,firefox,webkit PROJECT=anil-erp npm run test:all-browsers
+
+# View reports
+npm run report          # Playwright HTML report
+npm run report:qa       # Custom QA report with perf/a11y warnings
 ```
 
-## Run
+## Architecture
+
+```
+core/           Engine: config loader, context, plugin registry, runner, retry
+plugins/        One plugin per capability (api, ui, workflows, forms, …)
+helpers/        Reusable utilities (forms, tables, network, evidence, …)
+reporting/      Custom HTML QA reporter
+configs/        One JSON file per project
+tests/          Unified suite entry point
+api-tests/      Legacy API-only entry (backward compatible)
+ui-tests/       Legacy UI-only entry (backward compatible)
+```
+
+### Plugin System
+
+Each plugin exports:
+
+```javascript
+export default {
+  id: 'workflows',
+  priority: 30,
+  isEnabled: (config) => config.workflows.length > 0,
+  register({ test, config, context, authHeadersRef }) {
+    // Register Playwright tests from config
+  },
+};
+```
+
+Enable/disable plugins in config:
+
+```json
+{
+  "plugins": {
+    "api": true,
+    "visual": false,
+    "accessibility": true
+  }
+}
+```
+
+Or via environment: `PLUGINS=api,ui,workflows`
+
+## Adding a New Project
+
+1. Copy `configs/project-template.json` → `configs/my-erp.json`
+2. Set `baseUrl`, `frontendUrl`, `auth`, `uiLogin`
+3. Add `endpoints[]` for API smoke tests
+4. Add `pages[]` for UI smoke tests
+5. Add `workflows[]` for CRUD flows
+6. Add other sections as needed
+
+Run: `PROJECT=my-erp npx playwright test`
+
+## Config Reference
+
+### Workflows (CRUD)
+
+```json
+{
+  "workflows": [{
+    "name": "Customer CRUD",
+    "tags": ["crud", "smoke"],
+    "requiresAuth": true,
+    "steps": [
+      { "action": "api", "method": "POST", "path": "/api/customers", "body": { "name": "{{unique:name}}" }, "saveAs": "customerId" },
+      { "action": "api", "method": "GET", "path": "/api/customers/{{customerId}}", "expectStatus": [200] },
+      { "action": "ui", "path": "/customers/{{customerId}}", "expectSelector": ".details" },
+      { "action": "form", "navigateTo": "/customers/{{customerId}}/edit", "fields": [...], "submit": true },
+      { "action": "search", "inputSelector": "#search", "query": "{{unique:name}}", "expectContains": "{{unique:name}}" },
+      { "action": "api", "method": "DELETE", "path": "/api/customers/{{customerId}}", "expectStatus": [204] },
+      { "action": "verify-notification", "selector": ".toast", "text": "deleted" }
+    ]
+  }]
+}
+```
+
+**Step actions:** `api`, `ui`, `form`, `click`, `search`, `verify-notification`, `verify-network`, `verify-present`, `verify-absent`, `wait`, `refresh`
+
+### Forms
+
+Supported field types: `text`, `email`, `password`, `number`, `textarea`, `select`, `dropdown`, `radio`, `checkbox`, `multiselect`, `autocomplete`, `date`, `datetime`, `datepicker`, `file`, `hidden`
+
+```json
+{
+  "forms": [{
+    "name": "Create customer",
+    "path": "/customers/new",
+    "fields": [
+      { "name": "email", "type": "email", "selector": "#email", "value": "{{unique:email}}" },
+      { "name": "status", "type": "select", "selector": "#status", "value": "active" }
+    ],
+    "expectNotification": { "text": "created", "type": "success" },
+    "verifyPersistence": true
+  }]
+}
+```
+
+### Template Variables
+
+| Variable | Description |
+|----------|-------------|
+| `{{runTag}}` | Unique per-run tag (`qa-test-a1b2c3d4`) |
+| `{{unique}}` | Random unique string |
+| `{{unique:email}}` | Random unique email |
+| `{{unique:name}}` | Random unique name |
+| `{{customerId}}` | Saved from earlier step via `saveAs` |
+
+### Roles
+
+```json
+{
+  "roles": [{
+    "name": "Sales",
+    "email": "sales@example.com",
+    "password": "password",
+    "accessiblePages": [{ "name": "Customers", "path": "/customers" }],
+    "hiddenPages": [{ "name": "Settings", "path": "/settings" }],
+    "forbiddenActions": [{ "name": "Delete all", "path": "/customers", "selector": "[data-delete-all]" }]
+  }]
+}
+```
+
+### Performance Thresholds
+
+```json
+{
+  "performance": {
+    "failOnSlow": false,
+    "thresholds": {
+      "pageLoadMs": 5000,
+      "apiResponseMs": 2000,
+      "jsBundleBytes": 2097152
+    }
+  }
+}
+```
+
+### Visual Regression
 
 ```bash
-PROJECT=anil-erp npx playwright test            # run everything
-PROJECT=anil-erp npx playwright test api-tests  # API only
-PROJECT=anil-erp npx playwright test ui-tests   # UI only
-npx playwright show-report reports/html         # view results
+# Update baselines
+VISUAL_UPDATE=true PROJECT=my-erp npx playwright test --update-snapshots
 ```
 
-`PROJECT` must match a filename in `configs/` (without `.json`).
+```json
+{
+  "visual": {
+    "screenshots": [{
+      "name": "Dashboard",
+      "path": "/dashboard",
+      "fullPage": true,
+      "mask": [".timestamp"]
+    }]
+  }
+}
+```
 
-## Adding a new project
+### Retry Strategy
 
-Copy `configs/anil-erp.json` to `configs/<your-project>.json` and edit:
+```json
+{
+  "retry": {
+    "maxRetries": 2,
+    "delayMs": 1000,
+    "transientOnly": true
+  }
+}
+```
 
-1. `baseUrl` / `frontendUrl` — where the backend API and frontend are running
-2. `auth` — how to log in and get a token (currently supports `bearer-login` and `api-key`; add new types in `core/auth.js`)
-3. `endpoints[]` — one entry per API route to test
-4. `pages[]` — one entry per frontend route to test
-5. `buttonChecks[]` (optional) — specific buttons to click and verify they do something
+Automatically retries on network errors, timeouts, 502/503/504. Real assertion failures are not retried.
 
-### Endpoint config fields
+## Reports
 
-| Field | Required | Notes |
-|---|---|---|
-| `name` | yes | shows up in test report |
-| `method` | yes | GET / POST / PUT / DELETE |
-| `path` | yes | supports `{{variable}}` from a prior step's `saveResponseField` |
-| `auth` | yes | `true` to send the bearer token, `false` for public routes |
-| `body` | no | request payload |
-| `expectStatus` | no | array of acceptable HTTP codes, default `[200]` |
-| `saveResponseField` | no | `{ "as": "name", "path": "data.uuid" }` — saves a value from this response for later steps |
-| `knownIssue` | no | if set, a failing assertion becomes a flagged "known issue" instead of a hard failure — use this for things you already know are stubbed/incomplete, so the suite stays green-vs-red meaningful |
+After a run, three reports are generated:
 
-### Page config fields
+| Report | Path | Contents |
+|--------|------|----------|
+| Playwright HTML | `reports/html/` | Standard Playwright report with traces, videos |
+| JSON results | `reports/results.json` | Machine-readable results |
+| QA Report | `reports/qa/qa-report.html` | Passed/failed/known issues, perf warnings, a11y violations, screenshots |
 
-| Field | Required | Notes |
-|---|---|---|
-| `name` | yes | |
-| `path` | yes | frontend route |
-| `requiresAuth` | yes | logs in via UI first if true (requires `uiLogin` block in config) |
-| `expectSelector` | no | CSS selector that should be visible once the page loads, default `body` |
-| `knownIssue` | no | same idea as above — known placeholder/mock pages don't hard-fail |
+On failure, evidence is saved to `reports/evidence/`:
+- Screenshot, video, trace (Playwright built-in)
+- DOM snapshot, console logs, network log
+- Request/response payloads, stack trace
 
-## Why "known issues" instead of just skipping
+## Environment Variables
 
-Marking something `knownIssue` instead of deleting it from the config means:
-- It still runs every time, so the moment it actually gets fixed, the report flags it as newly-passing
-- It shows up in the report as a distinct "known issue" status, not invisible, so nothing rots silently
+| Variable | Description |
+|----------|-------------|
+| `PROJECT` | Config name (required) — matches `configs/{PROJECT}.json` |
+| `PLUGINS` | Comma-separated plugin IDs to run |
+| `TAGS` | Comma-separated test tags to filter |
+| `BROWSERS` | `chromium,firefox,webkit` |
+| `HEADED` | `true` for headed mode |
 
 ## Philosophy
 
-One engine (`core/`), many configs. When you start a new project, you're writing JSON, not new test code.
-If a project needs something genuinely new (a different auth scheme, a different kind of check), extend
-`core/auth.js` or add a new generic test file — keep it generic so every other project benefits too.
+- **One engine, many configs** — new projects write JSON, not test code
+- **Plugin-based** — new capabilities = new plugin, core stays untouched
+- **Backward compatible** — existing `endpoints[]` and `pages[]` configs work unchanged
+- **Opt-in advanced features** — performance, a11y, visual, responsive require explicit config
+- **Known issues** — mark broken features with `knownIssue` so they don't hard-fail but stay visible
+
+## Extending
+
+To add a new capability:
+
+1. Create `plugins/myFeature/index.js` with `id`, `priority`, `isEnabled`, `register`
+2. Register it in `core/pluginRegistry.js` `loadPlugins()`
+3. Add config section to `configs/project-template.json`
+4. Document in this README
+
+No changes to core runner or other plugins required.
