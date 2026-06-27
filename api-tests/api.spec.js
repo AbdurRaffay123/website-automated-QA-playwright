@@ -1,13 +1,14 @@
 import { test, expect } from '@playwright/test';
 import { loadConfig, resolveTemplate } from '../core/config.js';
 import { getAuthHeaders } from '../core/auth.js';
+import { getRunTag } from '../core/runTag.js';
 
 const config = loadConfig();
 
 test.describe(`API tests - ${config.projectName}`, () => {
   // shared across steps within this run, so later endpoints can reference
-  // values saved by earlier ones (e.g. {{createdContactUuid}})
-  const context = {};
+  // values saved by earlier ones (e.g. {{createdContactUuid}}, {{runTag}})
+  const context = { runTag: getRunTag() };
   let authHeaders = {};
 
   test.beforeAll(async ({ request }) => {

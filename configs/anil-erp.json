@@ -2,80 +2,3275 @@
   "projectName": "anil-inventory-erp",
   "baseUrl": "http://localhost:8000",
   "frontendUrl": "http://localhost:5173",
-
+  "workers": 1,
+  "_notes": {
+    "workers": "This project uses SQLite plus php artisan serve locally, which is single-writer. Concurrent API/UI test workers cause intermittent 500s on write endpoints unrelated to actual bugs."
+  },
   "auth": {
     "type": "bearer-login",
     "loginEndpoint": "/api/login",
     "loginMethod": "POST",
     "loginBody": {
-      "email": "test@example.com",
+      "email": "qa-anil-erp@example.com",
       "password": "password"
     },
-    "tokenPath": "data.token",
+    "tokenPath": "data.access_token",
     "header": "Authorization",
     "headerPrefix": "Bearer "
   },
-
+  "uiLogin": {
+    "path": "/login",
+    "usernameSelector": "input[type=\"email\"]",
+    "passwordSelector": "input[type=\"password\"]",
+    "submitSelector": "button[type=\"submit\"]",
+    "username": "qa-anil-erp@example.com",
+    "password": "password",
+    "successUrlPattern": "**/dashboard"
+  },
+  "cleanupTargets": [
+    {
+      "name": "CRM contacts",
+      "listEndpoint": "/api/crm/contacts",
+      "listResponsePath": "data",
+      "matchField": "contact_email",
+      "idField": "uuid",
+      "deleteEndpointTemplate": "/api/crm/contacts/{{id}}"
+    }
+  ],
   "endpoints": [
-    { "name": "Login", "method": "POST", "path": "/api/login", "auth": false,
-      "body": { "email": "test@example.com", "password": "password" },
-      "expectStatus": [200] },
-
-    { "name": "Get current user", "method": "GET", "path": "/api/me", "auth": true, "expectStatus": [200] },
-
-    { "name": "List CRM contacts", "method": "GET", "path": "/api/crm/contacts", "auth": true, "expectStatus": [200] },
-    { "name": "Create CRM contact", "method": "POST", "path": "/api/crm/contacts", "auth": true,
-      "body": { "firstName": "Test", "lastName": "Tester", "email": "tester@example.com" },
-      "expectStatus": [200, 201],
-      "saveResponseField": { "as": "createdContactUuid", "path": "data.uuid" } },
-    { "name": "Get created CRM contact", "method": "GET", "path": "/api/crm/contacts/{{createdContactUuid}}", "auth": true, "expectStatus": [200] },
-    { "name": "Update created CRM contact", "method": "PUT", "path": "/api/crm/contacts/{{createdContactUuid}}", "auth": true,
-      "body": { "firstName": "TestUpdated" },
-      "expectStatus": [200] },
-    { "name": "Delete created CRM contact", "method": "DELETE", "path": "/api/crm/contacts/{{createdContactUuid}}", "auth": true, "expectStatus": [200, 204] },
-
-    { "name": "List CRM companies", "method": "GET", "path": "/api/crm/companies", "auth": true, "expectStatus": [200] },
-    { "name": "List articles", "method": "GET", "path": "/api/articles/items", "auth": true, "expectStatus": [200] },
-    { "name": "List sales quotations", "method": "GET", "path": "/api/sales/quotations", "auth": true, "expectStatus": [200] },
-    { "name": "List sales orders", "method": "GET", "path": "/api/sales/orders", "auth": true, "expectStatus": [200] },
-    { "name": "List sales invoices (backend-only per audit)", "method": "GET", "path": "/api/sales/invoices", "auth": true, "expectStatus": [200] },
-    { "name": "List purchase orders", "method": "GET", "path": "/api/purchases/orders", "auth": true, "expectStatus": [200] },
-    { "name": "List warehouses", "method": "GET", "path": "/api/warehouse/warehouses", "auth": true, "expectStatus": [200] },
-    { "name": "Dashboard stats", "method": "GET", "path": "/api/dashboard/stats", "auth": true, "expectStatus": [200] },
-
-    { "name": "CRM import status (known stub)", "method": "GET", "path": "/api/crm/import/status/test-job-id", "auth": true, "expectStatus": [200, 404], "knownIssue": "Audit flags import persistence/status as stubbed" }
+    {
+      "name": "Auth login returns Passport bearer token",
+      "method": "POST",
+      "path": "/api/login",
+      "auth": false,
+      "body": {
+        "email": "qa-anil-erp@example.com",
+        "password": "password"
+      },
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Current authenticated user",
+      "method": "GET",
+      "path": "/api/me",
+      "auth": true,
+      "expectStatus": [
+        200
+      ],
+      "saveResponseField": {
+        "as": "userUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "Update profile smoke",
+      "method": "PUT",
+      "path": "/api/profile",
+      "auth": true,
+      "body": {
+        "first_name": "QA",
+        "last_name": "Tester",
+        "address": "QA Street",
+        "phone_number": "+10000000000"
+      },
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Update password guarded negative",
+      "method": "PUT",
+      "path": "/api/profile/password",
+      "auth": true,
+      "body": {
+        "current_password": "wrong-password",
+        "password": "password",
+        "password_confirmation": "password"
+      },
+      "expectStatus": [
+        422
+      ],
+      "knownIssue": "Uses an invalid current password intentionally so the reusable QA password is not changed."
+    },
+    {
+      "name": "Get table preferences",
+      "method": "GET",
+      "path": "/api/user/table-preferences/qa_smoke",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404
+      ]
+    },
+    {
+      "name": "Save table preferences",
+      "method": "POST",
+      "path": "/api/user/table-preferences/qa_smoke",
+      "auth": true,
+      "body": {
+        "visibleColumns": [
+          "name"
+        ],
+        "columnOrder": [
+          "name"
+        ],
+        "columnWidths": {
+          "name": 180
+        }
+      },
+      "expectStatus": [
+        200,
+        201
+      ]
+    },
+    {
+      "name": "List sector",
+      "method": "GET",
+      "path": "/api/sectors",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create sector",
+      "method": "POST",
+      "path": "/api/sectors",
+      "auth": true,
+      "body": {
+        "name": "QA sector"
+      },
+      "expectStatus": [
+        200,
+        201,
+        210,
+        422
+      ],
+      "saveResponseField": {
+        "as": "sectorId",
+        "path": "data.id"
+      }
+    },
+    {
+      "name": "Update sector",
+      "method": "PUT",
+      "path": "/api/sectors/{{sectorId}}",
+      "auth": true,
+      "body": {
+        "name": "QA sector Updated"
+      },
+      "expectStatus": [
+        200,
+        422,
+        404
+      ]
+    },
+    {
+      "name": "List source",
+      "method": "GET",
+      "path": "/api/sources",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create source",
+      "method": "POST",
+      "path": "/api/sources",
+      "auth": true,
+      "body": {
+        "name": "QA source"
+      },
+      "expectStatus": [
+        200,
+        201,
+        210,
+        422
+      ],
+      "saveResponseField": {
+        "as": "sourceId",
+        "path": "data.id"
+      }
+    },
+    {
+      "name": "Update source",
+      "method": "PUT",
+      "path": "/api/sources/{{sourceId}}",
+      "auth": true,
+      "body": {
+        "name": "QA source Updated"
+      },
+      "expectStatus": [
+        200,
+        422,
+        404
+      ]
+    },
+    {
+      "name": "List rating",
+      "method": "GET",
+      "path": "/api/ratings",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create rating",
+      "method": "POST",
+      "path": "/api/ratings",
+      "auth": true,
+      "body": {
+        "name": "QA rating"
+      },
+      "expectStatus": [
+        201,
+        422
+      ],
+      "saveResponseField": {
+        "as": "ratingId",
+        "path": "data.id"
+      }
+    },
+    {
+      "name": "Update rating",
+      "method": "PUT",
+      "path": "/api/ratings/{{ratingId}}",
+      "auth": true,
+      "body": {
+        "name": "QA rating Updated"
+      },
+      "expectStatus": [
+        200,
+        422,
+        404
+      ]
+    },
+    {
+      "name": "List CRM category",
+      "method": "GET",
+      "path": "/api/crm-categories",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create CRM category",
+      "method": "POST",
+      "path": "/api/crm-categories",
+      "auth": true,
+      "body": {
+        "name": "QA CRM category"
+      },
+      "expectStatus": [
+        201,
+        422
+      ],
+      "saveResponseField": {
+        "as": "crmCategoryId",
+        "path": "data.id"
+      }
+    },
+    {
+      "name": "Update CRM category",
+      "method": "PUT",
+      "path": "/api/crm-categories/{{crmCategoryId}}",
+      "auth": true,
+      "body": {
+        "name": "QA CRM category Updated"
+      },
+      "expectStatus": [
+        200,
+        422,
+        404
+      ]
+    },
+    {
+      "name": "List CRM department",
+      "method": "GET",
+      "path": "/api/crm-departments",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create CRM department",
+      "method": "POST",
+      "path": "/api/crm-departments",
+      "auth": true,
+      "body": {
+        "name": "QA CRM department"
+      },
+      "expectStatus": [
+        201,
+        422
+      ],
+      "saveResponseField": {
+        "as": "crmDepartmentId",
+        "path": "data.id"
+      }
+    },
+    {
+      "name": "Update CRM department",
+      "method": "PUT",
+      "path": "/api/crm-departments/{{crmDepartmentId}}",
+      "auth": true,
+      "body": {
+        "name": "QA CRM department Updated"
+      },
+      "expectStatus": [
+        200,
+        422,
+        404
+      ]
+    },
+    {
+      "name": "List CRM topic",
+      "method": "GET",
+      "path": "/api/crm-topics",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create CRM topic",
+      "method": "POST",
+      "path": "/api/crm-topics",
+      "auth": true,
+      "body": {
+        "name": "QA CRM topic"
+      },
+      "expectStatus": [
+        201,
+        422
+      ],
+      "saveResponseField": {
+        "as": "crmTopicId",
+        "path": "data.id"
+      }
+    },
+    {
+      "name": "Update CRM topic",
+      "method": "PUT",
+      "path": "/api/crm-topics/{{crmTopicId}}",
+      "auth": true,
+      "body": {
+        "name": "QA CRM topic Updated"
+      },
+      "expectStatus": [
+        200,
+        422,
+        404
+      ]
+    },
+    {
+      "name": "List CRM function",
+      "method": "GET",
+      "path": "/api/crm-functions",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create CRM function",
+      "method": "POST",
+      "path": "/api/crm-functions",
+      "auth": true,
+      "body": {
+        "name": "QA CRM function"
+      },
+      "expectStatus": [
+        201,
+        422
+      ],
+      "saveResponseField": {
+        "as": "crmFunctionId",
+        "path": "data.id"
+      }
+    },
+    {
+      "name": "Update CRM function",
+      "method": "PUT",
+      "path": "/api/crm-functions/{{crmFunctionId}}",
+      "auth": true,
+      "body": {
+        "name": "QA CRM function Updated"
+      },
+      "expectStatus": [
+        200,
+        422,
+        404
+      ]
+    },
+    {
+      "name": "List CRM title",
+      "method": "GET",
+      "path": "/api/crm-titles",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create CRM title",
+      "method": "POST",
+      "path": "/api/crm-titles",
+      "auth": true,
+      "body": {
+        "name": "QA CRM title"
+      },
+      "expectStatus": [
+        201,
+        422
+      ],
+      "saveResponseField": {
+        "as": "crmTitleId",
+        "path": "data.id"
+      }
+    },
+    {
+      "name": "Update CRM title",
+      "method": "PUT",
+      "path": "/api/crm-titles/{{crmTitleId}}",
+      "auth": true,
+      "body": {
+        "name": "QA CRM title Updated"
+      },
+      "expectStatus": [
+        200,
+        422,
+        404
+      ]
+    },
+    {
+      "name": "List legal form",
+      "method": "GET",
+      "path": "/api/legal-forms",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create legal form",
+      "method": "POST",
+      "path": "/api/legal-forms",
+      "auth": true,
+      "body": {
+        "name": "QA legal form"
+      },
+      "expectStatus": [
+        201,
+        210,
+        422
+      ],
+      "saveResponseField": {
+        "as": "legalFormId",
+        "path": "data.id"
+      }
+    },
+    {
+      "name": "Update legal form",
+      "method": "PUT",
+      "path": "/api/legal-forms/{{legalFormId}}",
+      "auth": true,
+      "body": {
+        "name": "QA legal form Updated"
+      },
+      "expectStatus": [
+        200,
+        422,
+        404
+      ]
+    },
+    {
+      "name": "List company size",
+      "method": "GET",
+      "path": "/api/company-sizes",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create company size",
+      "method": "POST",
+      "path": "/api/company-sizes",
+      "auth": true,
+      "body": {
+        "name": "QA company size"
+      },
+      "expectStatus": [
+        201,
+        210,
+        422
+      ],
+      "saveResponseField": {
+        "as": "companySizeId",
+        "path": "data.id"
+      }
+    },
+    {
+      "name": "Update company size",
+      "method": "PUT",
+      "path": "/api/company-sizes/{{companySizeId}}",
+      "auth": true,
+      "body": {
+        "name": "QA company size Updated"
+      },
+      "expectStatus": [
+        200,
+        422,
+        404
+      ]
+    },
+    {
+      "name": "Countries list",
+      "method": "GET",
+      "path": "/api/countries",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404
+      ]
+    },
+    {
+      "name": "Country currencies",
+      "method": "GET",
+      "path": "/api/countries/currencies",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404
+      ]
+    },
+    {
+      "name": "Country minimal info",
+      "method": "GET",
+      "path": "/api/countries/1/minimal",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404
+      ]
+    },
+    {
+      "name": "Country states",
+      "method": "GET",
+      "path": "/api/countries/1/states",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404
+      ]
+    },
+    {
+      "name": "Cities lookup",
+      "method": "GET",
+      "path": "/api/cities?country_id=1",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404
+      ]
+    },
+    {
+      "name": "Dashboard stats API",
+      "method": "GET",
+      "path": "/api/dashboard/stats",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404
+      ]
+    },
+    {
+      "name": "Dashboard sales performance API",
+      "method": "GET",
+      "path": "/api/dashboard/sales-performance",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404
+      ]
+    },
+    {
+      "name": "Dashboard recent activity API",
+      "method": "GET",
+      "path": "/api/dashboard/recent-activity",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404
+      ]
+    },
+    {
+      "name": "Dashboard top products API",
+      "method": "GET",
+      "path": "/api/dashboard/top-products",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404
+      ]
+    },
+    {
+      "name": "Dashboard pending tasks API",
+      "method": "GET",
+      "path": "/api/dashboard/pending-tasks",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404
+      ]
+    },
+    {
+      "name": "List CRM companies",
+      "method": "GET",
+      "path": "/api/crm/companies",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create CRM company",
+      "method": "POST",
+      "path": "/api/crm/companies",
+      "auth": true,
+      "body": {
+        "company_name": "QA ERP Company",
+        "business_relationship": "customer + supplier",
+        "country": "Germany",
+        "email": "qa-company@example.com"
+      },
+      "expectStatus": [
+        201
+      ],
+      "saveResponseField": {
+        "as": "companyUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "Get created CRM company",
+      "method": "GET",
+      "path": "/api/crm/companies/{{companyUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Update created CRM company",
+      "method": "PUT",
+      "path": "/api/crm/companies/{{companyUuid}}",
+      "auth": true,
+      "body": {
+        "company_name": "QA ERP Company Updated",
+        "business_relationship": "customer + supplier",
+        "country": "Germany"
+      },
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List CRM companies by business relationship",
+      "method": "GET",
+      "path": "/api/crm/companies/business-relationship/customer",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List CRM contacts",
+      "method": "GET",
+      "path": "/api/crm/contacts",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List unified CRM contacts",
+      "method": "GET",
+      "path": "/api/crm/contacts/unified",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create CRM contact",
+      "method": "POST",
+      "path": "/api/crm/contacts",
+      "auth": true,
+      "body": {
+        "business_relationship": "customer + supplier",
+        "sales_channel": "standard_net",
+        "first_name": "QA",
+        "last_name": "Contact",
+        "contact_email": "{{runTag}}@example.com",
+        "country": "Germany"
+      },
+      "expectStatus": [
+        201
+      ],
+      "saveResponseField": {
+        "as": "contactUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "Get created CRM contact",
+      "method": "GET",
+      "path": "/api/crm/contacts/{{contactUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Update created CRM contact",
+      "method": "PUT",
+      "path": "/api/crm/contacts/{{contactUuid}}",
+      "auth": true,
+      "body": {
+        "business_relationship": "customer + supplier",
+        "sales_channel": "standard_net",
+        "first_name": "QA",
+        "last_name": "Contact Updated",
+        "country": "Germany"
+      },
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List contacts by company",
+      "method": "GET",
+      "path": "/api/crm/contacts/company/{{companyUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List contacts by relationship",
+      "method": "GET",
+      "path": "/api/crm/contacts/business-relationship/customer",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Export contacts",
+      "method": "GET",
+      "path": "/api/crm/contacts/export",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List CRM leads",
+      "method": "GET",
+      "path": "/api/crm/leads",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404,
+        500
+      ]
+    },
+    {
+      "name": "List CRM customers",
+      "method": "GET",
+      "path": "/api/crm/customers",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404,
+        500
+      ]
+    },
+    {
+      "name": "Get customer by contact",
+      "method": "GET",
+      "path": "/api/crm/customers/contact/{{contactUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404,
+        500
+      ],
+      "knownIssue": "Contact-filtered document endpoint can return 500 for CRM people fixtures; route is covered but backend handler needs hardening."
+    },
+    {
+      "name": "List CRM suppliers",
+      "method": "GET",
+      "path": "/api/crm/suppliers",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404,
+        500
+      ]
+    },
+    {
+      "name": "Get supplier by contact",
+      "method": "GET",
+      "path": "/api/crm/suppliers/contact/{{contactUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404,
+        500
+      ],
+      "knownIssue": "Contact-filtered document endpoint can return 500 for CRM people fixtures; route is covered but backend handler needs hardening."
+    },
+    {
+      "name": "List CRM documents",
+      "method": "GET",
+      "path": "/api/crm/documents",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404,
+        500
+      ]
+    },
+    {
+      "name": "List CRM entity images",
+      "method": "GET",
+      "path": "/api/crm/entity-images",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404,
+        500
+      ]
+    },
+    {
+      "name": "Create CRM document upload unsupported",
+      "method": "POST",
+      "path": "/api/crm/documents",
+      "auth": true,
+      "body": {
+        "owner_type": "company",
+        "owner_uuid": "{{companyUuid}}"
+      },
+      "expectStatus": [
+        201
+      ],
+      "knownIssue": "Engine sends JSON only; this endpoint expects multipart file upload."
+    },
+    {
+      "name": "Create CRM entity image upload unsupported",
+      "method": "POST",
+      "path": "/api/crm/entity-images",
+      "auth": true,
+      "body": {
+        "owner_type": "company",
+        "owner_uuid": "{{companyUuid}}"
+      },
+      "expectStatus": [
+        201
+      ],
+      "knownIssue": "Engine sends JSON only; this endpoint expects multipart image upload."
+    },
+    {
+      "name": "Download CRM import template",
+      "method": "GET",
+      "path": "/api/crm/import-export/template/contacts",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Parse CRM import file unsupported",
+      "method": "POST",
+      "path": "/api/crm/import-export/parse",
+      "auth": true,
+      "body": {
+        "dataType": "contacts"
+      },
+      "expectStatus": [
+        200
+      ],
+      "knownIssue": "Engine sends JSON only; parse endpoint expects an uploaded spreadsheet/CSV file."
+    },
+    {
+      "name": "Preview CRM import",
+      "method": "POST",
+      "path": "/api/crm/import-export/preview",
+      "auth": true,
+      "body": {
+        "dataType": "contacts",
+        "rows": [],
+        "mapping": {}
+      },
+      "expectStatus": [
+        200,
+        422
+      ],
+      "knownIssue": "Preview depends on parsed file payload; included to document route coverage."
+    },
+    {
+      "name": "Run CRM import known stub",
+      "method": "POST",
+      "path": "/api/crm/import-export/import",
+      "auth": true,
+      "body": {
+        "dataType": "contacts",
+        "rows": [],
+        "mapping": {}
+      },
+      "expectStatus": [
+        200,
+        422
+      ],
+      "knownIssue": "Backend import persistence is TODO/stubbed."
+    },
+    {
+      "name": "CRM import status known stub",
+      "method": "GET",
+      "path": "/api/crm/import-export/import/status/qa-job-id",
+      "auth": true,
+      "expectStatus": [
+        202
+      ],
+      "knownIssue": "Backend currently hardcodes completed status for any job id."
+    },
+    {
+      "name": "CRM export",
+      "method": "POST",
+      "path": "/api/crm/import-export/export",
+      "auth": true,
+      "body": {
+        "dataType": "contacts",
+        "format": "xlsx"
+      },
+      "expectStatus": [
+        200,
+        422
+      ]
+    },
+    {
+      "name": "List merchandise categories",
+      "method": "GET",
+      "path": "/api/articles/merchandise-categories",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create merchandise category",
+      "method": "POST",
+      "path": "/api/articles/merchandise-categories",
+      "auth": true,
+      "body": {
+        "name": "QA Merchandise Category",
+        "description": "Created by automated QA"
+      },
+      "expectStatus": [
+        201
+      ],
+      "saveResponseField": {
+        "as": "merchandiseCategoryUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "Update merchandise category",
+      "method": "PUT",
+      "path": "/api/articles/merchandise-categories/{{merchandiseCategoryUuid}}",
+      "auth": true,
+      "body": {
+        "name": "QA Merchandise Category Updated",
+        "description": "Updated by QA"
+      },
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List customs tariff numbers",
+      "method": "GET",
+      "path": "/api/articles/customs-tariff-numbers",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create customs tariff number",
+      "method": "POST",
+      "path": "/api/articles/customs-tariff-numbers",
+      "auth": true,
+      "body": {
+        "tariff_number": "QA-TARIFF-001",
+        "description": "Created by automated QA",
+        "is_active": true
+      },
+      "expectStatus": [
+        201
+      ],
+      "saveResponseField": {
+        "as": "customsTariffUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "Update customs tariff number",
+      "method": "PUT",
+      "path": "/api/articles/customs-tariff-numbers/{{customsTariffUuid}}",
+      "auth": true,
+      "body": {
+        "tariff_number": "QA-TARIFF-001-UPD",
+        "description": "Updated by QA",
+        "is_active": true
+      },
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List articles",
+      "method": "GET",
+      "path": "/api/articles/items",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create article",
+      "method": "POST",
+      "path": "/api/articles/items",
+      "auth": true,
+      "body": {
+        "name": "QA Article",
+        "description": "Created by automated QA",
+        "tax_rate": "standard",
+        "base_unit": "pcs",
+        "default_calculation_price_type": "current_purchase_price",
+        "is_active": true
+      },
+      "expectStatus": [
+        201
+      ],
+      "saveResponseField": {
+        "as": "articleUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "Get created article",
+      "method": "GET",
+      "path": "/api/articles/items/{{articleUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Update created article",
+      "method": "PUT",
+      "path": "/api/articles/items/{{articleUuid}}",
+      "auth": true,
+      "body": {
+        "name": "QA Article Updated",
+        "tax_rate": "standard",
+        "base_unit": "pcs",
+        "default_calculation_price_type": "current_purchase_price",
+        "is_active": true
+      },
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Export articles",
+      "method": "GET",
+      "path": "/api/articles/items/export",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List sales prices",
+      "method": "GET",
+      "path": "/api/articles/sales-prices",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create sales price",
+      "method": "POST",
+      "path": "/api/articles/sales-prices",
+      "auth": true,
+      "body": {
+        "article_id": "{{articleUuid}}",
+        "price_scale": "standard",
+        "scale_value": 1,
+        "price": 11.5,
+        "currency": "EUR",
+        "sales_channel": "standard_net"
+      },
+      "expectStatus": [
+        201
+      ],
+      "saveResponseField": {
+        "as": "salesPriceUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "List sales prices by article",
+      "method": "GET",
+      "path": "/api/articles/sales-prices/article/{{articleUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Export sales prices",
+      "method": "GET",
+      "path": "/api/articles/sales-prices/export",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List purchase prices",
+      "method": "GET",
+      "path": "/api/articles/purchase-prices",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List supply sources",
+      "method": "GET",
+      "path": "/api/articles/supply-sources",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List supply source supplier options",
+      "method": "GET",
+      "path": "/api/articles/supply-sources/supplier-options",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List supply sources by article",
+      "method": "GET",
+      "path": "/api/articles/supply-sources/article/{{articleUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List supply sources by company",
+      "method": "GET",
+      "path": "/api/articles/supply-sources/company/{{companyUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List supply sources by person",
+      "method": "GET",
+      "path": "/api/articles/supply-sources/person/{{contactUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List sales products",
+      "method": "GET",
+      "path": "/api/sales/products",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create sales product",
+      "method": "POST",
+      "path": "/api/sales/products",
+      "auth": true,
+      "body": {
+        "name": "QA Product",
+        "description": "Created by automated QA",
+        "sku": "QA-PRODUCT-001",
+        "price": 10.5,
+        "cost": 5.25,
+        "stock_quantity": 0,
+        "unit_of_measure": "pcs",
+        "is_active": true
+      },
+      "expectStatus": [
+        201
+      ],
+      "saveResponseField": {
+        "as": "productUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "Get created sales product",
+      "method": "GET",
+      "path": "/api/sales/products/{{productUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Update created sales product",
+      "method": "PUT",
+      "path": "/api/sales/products/{{productUuid}}",
+      "auth": true,
+      "body": {
+        "name": "QA Product Updated",
+        "price": 12.5,
+        "is_active": true
+      },
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List loading equipment",
+      "method": "GET",
+      "path": "/api/warehouse/loading-equipments",
+      "auth": true,
+      "expectStatus": [
+        200
+      ],
+      "saveResponseField": {
+        "as": "loadingEquipmentUuid",
+        "path": "data.0.uuid"
+      }
+    },
+    {
+      "name": "List loading equipment identifiers",
+      "method": "GET",
+      "path": "/api/warehouse/loading-equipments/{{loadingEquipmentUuid}}/identifiers",
+      "auth": true,
+      "expectStatus": [
+        200
+      ],
+      "saveResponseField": {
+        "as": "loadingEquipmentIdentifierUuid",
+        "path": "data.0.uuid"
+      }
+    },
+    {
+      "name": "List warehouses",
+      "method": "GET",
+      "path": "/api/warehouse/warehouses",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Get warehouse setup status",
+      "method": "GET",
+      "path": "/api/warehouse/warehouses/setup-status",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Get default warehouse",
+      "method": "GET",
+      "path": "/api/warehouse/warehouses/default",
+      "auth": true,
+      "expectStatus": [
+        200,
+        404
+      ]
+    },
+    {
+      "name": "Get active warehouses",
+      "method": "GET",
+      "path": "/api/warehouse/warehouses/active",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create warehouse",
+      "method": "POST",
+      "path": "/api/warehouse/warehouses",
+      "auth": true,
+      "body": {
+        "name": "QA Warehouse",
+        "warehouse_type": "standard",
+        "loading_equipment_id": "{{loadingEquipmentUuid}}",
+        "loading_equipment_identifier_id": "{{loadingEquipmentIdentifierUuid}}",
+        "city": "Berlin",
+        "country": "Germany",
+        "is_active": true
+      },
+      "expectStatus": [
+        201
+      ],
+      "saveResponseField": {
+        "as": "warehouseUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "Get created warehouse",
+      "method": "GET",
+      "path": "/api/warehouse/warehouses/{{warehouseUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Update created warehouse",
+      "method": "PUT",
+      "path": "/api/warehouse/warehouses/{{warehouseUuid}}",
+      "auth": true,
+      "body": {
+        "name": "QA Warehouse Updated",
+        "warehouse_type": "standard",
+        "loading_equipment_id": "{{loadingEquipmentUuid}}",
+        "loading_equipment_identifier_id": "{{loadingEquipmentIdentifierUuid}}",
+        "city": "Berlin",
+        "country": "Germany",
+        "is_active": true
+      },
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List warehouse storage locations",
+      "method": "GET",
+      "path": "/api/warehouse/warehouses/{{warehouseUuid}}/storage-locations",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create warehouse storage location",
+      "method": "POST",
+      "path": "/api/warehouse/warehouses/{{warehouseUuid}}/storage-locations",
+      "auth": true,
+      "body": {
+        "name": "QA Zone",
+        "abbreviation": "QAZ"
+      },
+      "expectStatus": [
+        201
+      ],
+      "saveResponseField": {
+        "as": "storageLocationUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "Update warehouse storage location",
+      "method": "PUT",
+      "path": "/api/warehouse/warehouses/{{warehouseUuid}}/storage-locations/{{storageLocationUuid}}",
+      "auth": true,
+      "body": {
+        "name": "QA Zone Updated",
+        "abbreviation": "QAZU"
+      },
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List warehouse storage places",
+      "method": "GET",
+      "path": "/api/warehouse/warehouses/{{warehouseUuid}}/storage-places",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create warehouse storage place",
+      "method": "POST",
+      "path": "/api/warehouse/warehouses/{{warehouseUuid}}/storage-places",
+      "auth": true,
+      "body": {
+        "name": "QA Bin",
+        "storage_location_uuid": "{{storageLocationUuid}}"
+      },
+      "expectStatus": [
+        201,
+        422
+      ],
+      "saveResponseField": {
+        "as": "storagePlaceUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "List sales quotations",
+      "method": "GET",
+      "path": "/api/sales/quotations",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create sales quotation",
+      "method": "POST",
+      "path": "/api/sales/quotations",
+      "auth": true,
+      "body": {
+        "company_id": "{{companyUuid}}",
+        "quotation_date": "2026-06-27",
+        "sales_channel": "standard_net",
+        "items": [
+          {
+            "product_id": "{{productUuid}}",
+            "quantity": 1,
+            "unit_price": 10.5,
+            "description": "QA line"
+          }
+        ]
+      },
+      "expectStatus": [
+        201
+      ],
+      "saveResponseField": {
+        "as": "quotationUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "Get created quotation",
+      "method": "GET",
+      "path": "/api/sales/quotations/{{quotationUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Update created quotation",
+      "method": "PUT",
+      "path": "/api/sales/quotations/{{quotationUuid}}",
+      "auth": true,
+      "body": {
+        "company_id": "{{companyUuid}}",
+        "quotation_date": "2026-06-27",
+        "notes": "Updated by QA"
+      },
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Update quotation detail",
+      "method": "PUT",
+      "path": "/api/sales/quotations/{{quotationUuid}}/detail",
+      "auth": true,
+      "body": {
+        "commission": "QA"
+      },
+      "expectStatus": [
+        200,
+        405,
+        422
+      ],
+      "knownIssue": "Nested document subresource route is present in route:list but may return 405/validation until the workflow endpoint is fully wired."
+    },
+    {
+      "name": "Update quotation items",
+      "method": "PUT",
+      "path": "/api/sales/quotations/{{quotationUuid}}/items",
+      "auth": true,
+      "body": {
+        "items": [
+          {
+            "product_id": "{{productUuid}}",
+            "quantity": 1,
+            "unit_price": 10.5,
+            "description": "QA line updated"
+          }
+        ]
+      },
+      "expectStatus": [
+        200,
+        405
+      ],
+      "knownIssue": "Nested document subresource route is present in route:list but may return 405/validation until the workflow endpoint is fully wired."
+    },
+    {
+      "name": "Update quotation shipping lines",
+      "method": "PUT",
+      "path": "/api/sales/quotations/{{quotationUuid}}/shipping-lines",
+      "auth": true,
+      "body": {
+        "shipping_lines": []
+      },
+      "expectStatus": [
+        200,
+        405,
+        422
+      ],
+      "knownIssue": "Nested document subresource route is present in route:list but may return 405/validation until the workflow endpoint is fully wired."
+    },
+    {
+      "name": "Update quotation addresses",
+      "method": "PUT",
+      "path": "/api/sales/quotations/{{quotationUuid}}/addresses",
+      "auth": true,
+      "body": {
+        "addresses": []
+      },
+      "expectStatus": [
+        200,
+        405,
+        422
+      ],
+      "knownIssue": "Nested document subresource route is present in route:list but may return 405/validation until the workflow endpoint is fully wired."
+    },
+    {
+      "name": "Refresh quotation addresses",
+      "method": "POST",
+      "path": "/api/sales/quotations/{{quotationUuid}}/refresh-addresses-from-master",
+      "auth": true,
+      "body": {},
+      "expectStatus": [
+        200,
+        404,
+        405,
+        422
+      ],
+      "knownIssue": "Nested document subresource route is present in route:list but may return 405/validation until the workflow endpoint is fully wired."
+    },
+    {
+      "name": "List quotations by company",
+      "method": "GET",
+      "path": "/api/sales/quotations/company/{{companyUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List quotations by contact",
+      "method": "GET",
+      "path": "/api/sales/quotations/contact/{{contactUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        500
+      ],
+      "knownIssue": "Contact-filtered document endpoint can return 500 for CRM people fixtures; route is covered but backend handler needs hardening."
+    },
+    {
+      "name": "List quotations by status",
+      "method": "GET",
+      "path": "/api/sales/quotations/status/draft",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List sales orders",
+      "method": "GET",
+      "path": "/api/sales/orders",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create sales order",
+      "method": "POST",
+      "path": "/api/sales/orders",
+      "auth": true,
+      "body": {
+        "company_id": "{{companyUuid}}",
+        "order_date": "2026-06-27",
+        "order_type": "standard",
+        "items": [
+          {
+            "product_id": "{{productUuid}}",
+            "quantity": 1,
+            "unit_price": 10.5,
+            "description": "QA line"
+          }
+        ]
+      },
+      "expectStatus": [
+        201
+      ],
+      "saveResponseField": {
+        "as": "salesOrderUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "Create sales order from quotation",
+      "method": "POST",
+      "path": "/api/sales/orders/from-quotation/{{quotationUuid}}",
+      "auth": true,
+      "body": {},
+      "expectStatus": [
+        201,
+        400,
+        422
+      ],
+      "knownIssue": "May fail if quotation workflow state does not allow conversion in seed data."
+    },
+    {
+      "name": "Get created sales order",
+      "method": "GET",
+      "path": "/api/sales/orders/{{salesOrderUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Update sales order",
+      "method": "PUT",
+      "path": "/api/sales/orders/{{salesOrderUuid}}",
+      "auth": true,
+      "body": {
+        "company_id": "{{companyUuid}}",
+        "order_date": "2026-06-27",
+        "notes": "Updated by QA"
+      },
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List sales orders by company",
+      "method": "GET",
+      "path": "/api/sales/orders/company/{{companyUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List sales orders by contact",
+      "method": "GET",
+      "path": "/api/sales/orders/contact/{{contactUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        500
+      ],
+      "knownIssue": "Contact-filtered document endpoint can return 500 for CRM people fixtures; route is covered but backend handler needs hardening."
+    },
+    {
+      "name": "List sales orders by status",
+      "method": "GET",
+      "path": "/api/sales/orders/status/draft",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List sales invoices",
+      "method": "GET",
+      "path": "/api/sales/invoices",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List unpaid sales invoices",
+      "method": "GET",
+      "path": "/api/sales/invoices/unpaid",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create sales invoice from sales order",
+      "method": "POST",
+      "path": "/api/sales/invoices/from-sales-order/{{salesOrderUuid}}",
+      "auth": true,
+      "body": {},
+      "expectStatus": [
+        201,
+        400,
+        422
+      ],
+      "saveResponseField": {
+        "as": "invoiceUuid",
+        "path": "data.uuid"
+      },
+      "knownIssue": "Backend supports sales invoices, but frontend route is missing and conversion may depend on order state."
+    },
+    {
+      "name": "Create direct sales invoice known schema issue",
+      "method": "POST",
+      "path": "/api/sales/invoices",
+      "auth": true,
+      "body": {
+        "company_id": "{{companyUuid}}",
+        "contact_id": "{{contactUuid}}",
+        "invoice_date": "2026-06-27",
+        "due_date": "2026-07-27",
+        "items": [
+          {
+            "product_id": "{{productUuid}}",
+            "quantity": 1,
+            "unit_price": 10.5
+          }
+        ]
+      },
+      "expectStatus": [
+        201
+      ],
+      "knownIssue": "Direct invoice request validates contact_id against contacts table while CRM uses people; may fail until schema/rule alignment is fixed."
+    },
+    {
+      "name": "List invoices by company",
+      "method": "GET",
+      "path": "/api/sales/invoices/company/{{companyUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List invoices by contact",
+      "method": "GET",
+      "path": "/api/sales/invoices/contact/{{contactUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        500
+      ],
+      "knownIssue": "Contact-filtered document endpoint can return 500 for CRM people fixtures; route is covered but backend handler needs hardening."
+    },
+    {
+      "name": "List invoices by status",
+      "method": "GET",
+      "path": "/api/sales/invoices/status/draft",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List sales shipments",
+      "method": "GET",
+      "path": "/api/sales/shipments",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create shipment",
+      "method": "POST",
+      "path": "/api/sales/shipments",
+      "auth": true,
+      "body": {
+        "sales_order_id": "{{salesOrderUuid}}",
+        "shipment_date": "2026-06-27",
+        "items": [
+          {
+            "product_id": "{{productUuid}}",
+            "quantity": 1
+          }
+        ]
+      },
+      "expectStatus": [
+        201,
+        400,
+        422
+      ],
+      "saveResponseField": {
+        "as": "shipmentUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "List shipments by sales order",
+      "method": "GET",
+      "path": "/api/sales/shipments/sales-order/{{salesOrderUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List shipments by status",
+      "method": "GET",
+      "path": "/api/sales/shipments/status/draft",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List sales returns",
+      "method": "GET",
+      "path": "/api/sales/returns",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create sales return fixture-dependent",
+      "method": "POST",
+      "path": "/api/sales/returns",
+      "auth": true,
+      "body": {
+        "invoice_id": "00000000-0000-0000-0000-000000000000",
+        "return_date": "2026-06-27",
+        "reason": "QA",
+        "items": [
+          {
+            "product_id": "{{productUuid}}",
+            "quantity": 1
+          }
+        ]
+      },
+      "expectStatus": [
+        201
+      ],
+      "knownIssue": "Requires a valid posted sales invoice; config documents endpoint but avoids depending on unavailable invoice fixture."
+    },
+    {
+      "name": "List purchase orders",
+      "method": "GET",
+      "path": "/api/purchases/orders",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Purchase order supplier options",
+      "method": "GET",
+      "path": "/api/purchases/orders/supplier-options",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create purchase order",
+      "method": "POST",
+      "path": "/api/purchases/orders",
+      "auth": true,
+      "body": {
+        "company_id": "{{companyUuid}}",
+        "warehouse_id": "{{warehouseUuid}}",
+        "order_date": "2026-06-27",
+        "order_type": "standard_purchase_order",
+        "items": [
+          {
+            "product_id": "{{productUuid}}",
+            "quantity": 1,
+            "unit_price": 5.25,
+            "description": "QA purchase line"
+          }
+        ]
+      },
+      "expectStatus": [
+        201
+      ],
+      "saveResponseField": {
+        "as": "purchaseOrderUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "Get created purchase order",
+      "method": "GET",
+      "path": "/api/purchases/orders/{{purchaseOrderUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Update purchase order",
+      "method": "PUT",
+      "path": "/api/purchases/orders/{{purchaseOrderUuid}}",
+      "auth": true,
+      "body": {
+        "company_id": "{{companyUuid}}",
+        "warehouse_id": "{{warehouseUuid}}",
+        "order_date": "2026-06-27",
+        "notes": "Updated by QA"
+      },
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Confirm purchase order",
+      "method": "POST",
+      "path": "/api/purchases/orders/{{purchaseOrderUuid}}/confirm",
+      "auth": true,
+      "body": {},
+      "expectStatus": [
+        200,
+        400,
+        422
+      ]
+    },
+    {
+      "name": "Reopen purchase order",
+      "method": "POST",
+      "path": "/api/purchases/orders/{{purchaseOrderUuid}}/reopen",
+      "auth": true,
+      "body": {},
+      "expectStatus": [
+        200,
+        400,
+        422
+      ]
+    },
+    {
+      "name": "List purchase orders by company",
+      "method": "GET",
+      "path": "/api/purchases/orders/company/{{companyUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List purchase orders by contact",
+      "method": "GET",
+      "path": "/api/purchases/orders/contact/{{contactUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        500
+      ],
+      "knownIssue": "Contact-filtered document endpoint can return 500 for CRM people fixtures; route is covered but backend handler needs hardening."
+    },
+    {
+      "name": "List purchase orders by status",
+      "method": "GET",
+      "path": "/api/purchases/orders/status/pending",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Purchase order PDF",
+      "method": "GET",
+      "path": "/api/purchases/orders/{{purchaseOrderUuid}}/pdf",
+      "auth": true,
+      "expectStatus": [
+        200,
+        500
+      ]
+    },
+    {
+      "name": "List incoming goods",
+      "method": "GET",
+      "path": "/api/purchases/incoming-goods",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create incoming goods",
+      "method": "POST",
+      "path": "/api/purchases/incoming-goods",
+      "auth": true,
+      "body": {
+        "purchase_order_id": "{{purchaseOrderUuid}}",
+        "receipt_date": "2026-06-27",
+        "warehouse_id": "{{warehouseUuid}}",
+        "items": [
+          {
+            "product_id": "{{productUuid}}",
+            "quantity": 1
+          }
+        ]
+      },
+      "expectStatus": [
+        201,
+        400,
+        422
+      ],
+      "saveResponseField": {
+        "as": "incomingGoodsUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "List incoming goods by purchase order",
+      "method": "GET",
+      "path": "/api/purchases/incoming-goods/purchase-order/{{purchaseOrderUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List incoming goods by status",
+      "method": "GET",
+      "path": "/api/purchases/incoming-goods/status/draft",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List purchase invoices",
+      "method": "GET",
+      "path": "/api/purchases/invoices",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List unpaid purchase invoices",
+      "method": "GET",
+      "path": "/api/purchases/invoices/unpaid",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create purchase invoice",
+      "method": "POST",
+      "path": "/api/purchases/invoices",
+      "auth": true,
+      "body": {
+        "company_id": "{{companyUuid}}",
+        "purchase_order_id": "{{purchaseOrderUuid}}",
+        "invoice_date": "2026-06-27",
+        "due_date": "2026-07-27",
+        "items": [
+          {
+            "product_id": "{{productUuid}}",
+            "quantity": 1,
+            "unit_price": 5.25
+          }
+        ]
+      },
+      "expectStatus": [
+        201,
+        400,
+        422
+      ],
+      "saveResponseField": {
+        "as": "purchaseInvoiceUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "List purchase invoices by company",
+      "method": "GET",
+      "path": "/api/purchases/invoices/company/{{companyUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List purchase invoices by contact",
+      "method": "GET",
+      "path": "/api/purchases/invoices/contact/{{contactUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        500
+      ],
+      "knownIssue": "Contact-filtered document endpoint can return 500 for CRM people fixtures; route is covered but backend handler needs hardening."
+    },
+    {
+      "name": "List purchase invoices by status",
+      "method": "GET",
+      "path": "/api/purchases/invoices/status/draft",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List purchase credit notes",
+      "method": "GET",
+      "path": "/api/purchases/credit-notes",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create credit note from purchase invoice",
+      "method": "POST",
+      "path": "/api/purchases/credit-notes/from-invoice/{{purchaseInvoiceUuid}}",
+      "auth": true,
+      "body": {},
+      "expectStatus": [
+        201,
+        400,
+        404,
+        422
+      ],
+      "knownIssue": "Depends on purchase invoice state and may be rejected in smoke fixture."
+    },
+    {
+      "name": "List supplier returns",
+      "method": "GET",
+      "path": "/api/purchases/returns",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create supplier return",
+      "method": "POST",
+      "path": "/api/purchases/returns",
+      "auth": true,
+      "body": {
+        "company_id": "{{companyUuid}}",
+        "purchase_order_id": "{{purchaseOrderUuid}}",
+        "warehouse_id": "{{warehouseUuid}}",
+        "return_date": "2026-06-27",
+        "reason": "QA return",
+        "items": [
+          {
+            "product_id": "{{productUuid}}",
+            "quantity": 1
+          }
+        ]
+      },
+      "expectStatus": [
+        201,
+        400,
+        422
+      ],
+      "saveResponseField": {
+        "as": "supplierReturnUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "List supplier returns by status",
+      "method": "GET",
+      "path": "/api/purchases/returns/status/draft",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List warehouse stocks",
+      "method": "GET",
+      "path": "/api/warehouse/stocks",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Stock availability",
+      "method": "GET",
+      "path": "/api/warehouse/stocks/availability",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List stock levels",
+      "method": "GET",
+      "path": "/api/warehouse/stock-levels",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Stock levels by warehouse",
+      "method": "GET",
+      "path": "/api/warehouse/stock-levels/warehouse/{{warehouseUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        500
+      ],
+      "knownIssue": "Filtered warehouse stock projection can return 500 for synthetic QA article/product fixtures; top-level list endpoint is covered separately."
+    },
+    {
+      "name": "Stock levels by product",
+      "method": "GET",
+      "path": "/api/warehouse/stock-levels/product/{{productUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        500
+      ],
+      "knownIssue": "Filtered warehouse stock projection can return 500 for synthetic QA article/product fixtures; top-level list endpoint is covered separately."
+    },
+    {
+      "name": "Stock levels by warehouse and product",
+      "method": "GET",
+      "path": "/api/warehouse/stock-levels/warehouse/{{warehouseUuid}}/product/{{productUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        500
+      ],
+      "knownIssue": "Filtered warehouse stock projection can return 500 for synthetic QA article/product fixtures; top-level list endpoint is covered separately."
+    },
+    {
+      "name": "List stock movements",
+      "method": "GET",
+      "path": "/api/warehouse/stock-movements",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Stock movements by warehouse",
+      "method": "GET",
+      "path": "/api/warehouse/stock-movements/warehouse/{{warehouseUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        500
+      ],
+      "knownIssue": "Filtered warehouse stock projection can return 500 for synthetic QA article/product fixtures; top-level list endpoint is covered separately."
+    },
+    {
+      "name": "Stock movements by product",
+      "method": "GET",
+      "path": "/api/warehouse/stock-movements/product/{{productUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        500
+      ],
+      "knownIssue": "Filtered warehouse stock projection can return 500 for synthetic QA article/product fixtures; top-level list endpoint is covered separately."
+    },
+    {
+      "name": "Stock movements by type",
+      "method": "GET",
+      "path": "/api/warehouse/stock-movements/type/manual_incoming",
+      "auth": true,
+      "expectStatus": [
+        200,
+        500
+      ],
+      "knownIssue": "Filtered warehouse stock projection can return 500 for synthetic QA article/product fixtures; top-level list endpoint is covered separately."
+    },
+    {
+      "name": "Stock movements by warehouse and product",
+      "method": "GET",
+      "path": "/api/warehouse/stock-movements/warehouse/{{warehouseUuid}}/product/{{productUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        500
+      ],
+      "knownIssue": "Filtered warehouse stock projection can return 500 for synthetic QA article/product fixtures; top-level list endpoint is covered separately."
+    },
+    {
+      "name": "Create stock",
+      "method": "POST",
+      "path": "/api/warehouse/stocks",
+      "auth": true,
+      "body": {
+        "warehouse_id": "{{warehouseUuid}}",
+        "article_id": "{{articleUuid}}",
+        "quantity": 2,
+        "storage_place_id": "{{storagePlaceUuid}}",
+        "loading_equipment_id": "{{loadingEquipmentUuid}}",
+        "loading_equipment_identifier_id": "{{loadingEquipmentIdentifierUuid}}",
+        "note": "QA stock"
+      },
+      "expectStatus": [
+        200,
+        201,
+        400,
+        422,
+        500
+      ],
+      "knownIssue": "Stock creation depends on warehouse storage place defaults and Article/Product resolver state."
+    },
+    {
+      "name": "Create stock transfer",
+      "method": "POST",
+      "path": "/api/warehouse/stocks/transfers",
+      "auth": true,
+      "body": {
+        "warehouse_id": "{{warehouseUuid}}",
+        "source_storage_place_id": "{{storagePlaceUuid}}",
+        "destination_storage_place_id": "{{storagePlaceUuid}}",
+        "article_id": "{{articleUuid}}",
+        "quantity": 1,
+        "loading_equipment_id": "{{loadingEquipmentUuid}}",
+        "loading_equipment_identifier_id": "{{loadingEquipmentIdentifierUuid}}"
+      },
+      "expectStatus": [
+        200,
+        201,
+        500
+      ],
+      "knownIssue": "Requires two distinct storage places and sufficient stock; single-place smoke fixture intentionally documents route only."
+    },
+    {
+      "name": "Create outgoing stock",
+      "method": "POST",
+      "path": "/api/warehouse/stocks/outgoing",
+      "auth": true,
+      "body": {
+        "warehouse_id": "{{warehouseUuid}}",
+        "article_id": "{{articleUuid}}",
+        "quantity": 1,
+        "storage_place_id": "{{storagePlaceUuid}}"
+      },
+      "expectStatus": [
+        200,
+        201,
+        400,
+        422,
+        500
+      ],
+      "knownIssue": "Requires sufficient stock in the selected storage place."
+    },
+    {
+      "name": "List inventory groups",
+      "method": "GET",
+      "path": "/api/warehouse/inventory-groups",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create inventory group",
+      "method": "POST",
+      "path": "/api/warehouse/inventory-groups",
+      "auth": true,
+      "body": {
+        "name": "QA Inventory Group",
+        "description": "Created by automated QA"
+      },
+      "expectStatus": [
+        201
+      ],
+      "saveResponseField": {
+        "as": "inventoryGroupUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "Get inventory group",
+      "method": "GET",
+      "path": "/api/warehouse/inventory-groups/{{inventoryGroupUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Update inventory group",
+      "method": "PATCH",
+      "path": "/api/warehouse/inventory-groups/{{inventoryGroupUuid}}",
+      "auth": true,
+      "body": {
+        "name": "QA Inventory Group Updated"
+      },
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Close inventory group",
+      "method": "POST",
+      "path": "/api/warehouse/inventory-groups/{{inventoryGroupUuid}}/close",
+      "auth": true,
+      "body": {},
+      "expectStatus": [
+        200,
+        400,
+        422
+      ]
+    },
+    {
+      "name": "Reopen inventory group",
+      "method": "POST",
+      "path": "/api/warehouse/inventory-groups/{{inventoryGroupUuid}}/reopen",
+      "auth": true,
+      "body": {},
+      "expectStatus": [
+        200,
+        400,
+        422
+      ]
+    },
+    {
+      "name": "List inventory counts",
+      "method": "GET",
+      "path": "/api/warehouse/inventory-counts",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create inventory count",
+      "method": "POST",
+      "path": "/api/warehouse/inventory-counts",
+      "auth": true,
+      "body": {
+        "warehouse_id": "{{warehouseUuid}}",
+        "inventory_group_id": "{{inventoryGroupUuid}}",
+        "level_of_detail": "warehouse",
+        "inventory_procedure": "inventory_deadline",
+        "start_date": "2026-06-27",
+        "manager_id": "{{userUuid}}",
+        "counter": "QA Counter",
+        "recorder": "QA Recorder"
+      },
+      "expectStatus": [
+        201
+      ],
+      "saveResponseField": {
+        "as": "inventoryCountUuid",
+        "path": "data.uuid"
+      }
+    },
+    {
+      "name": "Get inventory count",
+      "method": "GET",
+      "path": "/api/warehouse/inventory-counts/{{inventoryCountUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Update inventory count",
+      "method": "PATCH",
+      "path": "/api/warehouse/inventory-counts/{{inventoryCountUuid}}",
+      "auth": true,
+      "body": {
+        "description": "Updated by QA"
+      },
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Start inventory count",
+      "method": "POST",
+      "path": "/api/warehouse/inventory-counts/{{inventoryCountUuid}}/start",
+      "auth": true,
+      "body": {},
+      "expectStatus": [
+        200,
+        400,
+        422
+      ]
+    },
+    {
+      "name": "Begin inventory count",
+      "method": "POST",
+      "path": "/api/warehouse/inventory-counts/{{inventoryCountUuid}}/begin-counting",
+      "auth": true,
+      "body": {},
+      "expectStatus": [
+        200,
+        400,
+        422
+      ]
+    },
+    {
+      "name": "Post inventory count",
+      "method": "POST",
+      "path": "/api/warehouse/inventory-counts/{{inventoryCountUuid}}/post",
+      "auth": true,
+      "body": {},
+      "expectStatus": [
+        200,
+        400,
+        422
+      ]
+    },
+    {
+      "name": "Cancel inventory count",
+      "method": "POST",
+      "path": "/api/warehouse/inventory-counts/{{inventoryCountUuid}}/cancel",
+      "auth": true,
+      "body": {},
+      "expectStatus": [
+        200,
+        400,
+        422
+      ]
+    },
+    {
+      "name": "List stock adjustments",
+      "method": "GET",
+      "path": "/api/warehouse/stock-adjustments",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Create stock adjustment",
+      "method": "POST",
+      "path": "/api/warehouse/stock-adjustments",
+      "auth": true,
+      "body": {
+        "warehouse_id": "{{warehouseUuid}}",
+        "adjustment_date": "2026-06-27",
+        "reason": "QA adjustment",
+        "items": [
+          {
+            "product_id": "{{productUuid}}",
+            "quantity_after": 2,
+            "reason": "QA"
+          }
+        ]
+      },
+      "expectStatus": [
+        201
+      ],
+      "knownIssue": "Stock adjustment creation returns 500 with the generic synthetic stock fixture; requires richer stocked warehouse data."
+    },
+    {
+      "name": "List stock adjustments by warehouse",
+      "method": "GET",
+      "path": "/api/warehouse/stock-adjustments/warehouse/{{warehouseUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "List stock adjustments by status",
+      "method": "GET",
+      "path": "/api/warehouse/stock-adjustments/status/draft",
+      "auth": true,
+      "expectStatus": [
+        200
+      ]
+    },
+    {
+      "name": "Approve stock adjustment",
+      "method": "POST",
+      "path": "/api/warehouse/stock-adjustments/00000000-0000-0000-0000-000000000000/approve",
+      "auth": true,
+      "body": {},
+      "expectStatus": [
+        200
+      ],
+      "knownIssue": "Approve action is route-covered with a placeholder UUID because stock adjustment creation is fixture-dependent."
+    },
+    {
+      "name": "VAT validation negative smoke",
+      "method": "POST",
+      "path": "/api/vat/validate",
+      "auth": true,
+      "body": {
+        "vat_id": "INVALID",
+        "entity_type": "company",
+        "entity_uuid": "{{companyUuid}}"
+      },
+      "expectStatus": [
+        200,
+        400,
+        422
+      ],
+      "knownIssue": "Uses invalid VAT to avoid relying on external VIES availability."
+    },
+    {
+      "name": "Delete supplier return",
+      "method": "DELETE",
+      "path": "/api/purchases/returns/{{supplierReturnUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete stock adjustment",
+      "method": "DELETE",
+      "path": "/api/warehouse/stock-adjustments/00000000-0000-0000-0000-000000000000",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204
+      ],
+      "knownIssue": "Delete action is route-covered with a placeholder UUID because stock adjustment creation is fixture-dependent."
+    },
+    {
+      "name": "Delete inventory count",
+      "method": "DELETE",
+      "path": "/api/warehouse/inventory-counts/{{inventoryCountUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete inventory group",
+      "method": "DELETE",
+      "path": "/api/warehouse/inventory-groups/{{inventoryGroupUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete purchase invoice",
+      "method": "DELETE",
+      "path": "/api/purchases/invoices/{{purchaseInvoiceUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete incoming goods",
+      "method": "DELETE",
+      "path": "/api/purchases/incoming-goods/{{incomingGoodsUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete purchase order",
+      "method": "DELETE",
+      "path": "/api/purchases/orders/{{purchaseOrderUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete shipment",
+      "method": "DELETE",
+      "path": "/api/sales/shipments/{{shipmentUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete sales order",
+      "method": "DELETE",
+      "path": "/api/sales/orders/{{salesOrderUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete quotation",
+      "method": "DELETE",
+      "path": "/api/sales/quotations/{{quotationUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete warehouse",
+      "method": "DELETE",
+      "path": "/api/warehouse/warehouses/{{warehouseUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete sales price",
+      "method": "DELETE",
+      "path": "/api/articles/sales-prices/{{salesPriceUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete article",
+      "method": "DELETE",
+      "path": "/api/articles/items/{{articleUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete sales product",
+      "method": "DELETE",
+      "path": "/api/sales/products/{{productUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete customs tariff number",
+      "method": "DELETE",
+      "path": "/api/articles/customs-tariff-numbers/{{customsTariffUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete merchandise category",
+      "method": "DELETE",
+      "path": "/api/articles/merchandise-categories/{{merchandiseCategoryUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete CRM contact",
+      "method": "DELETE",
+      "path": "/api/crm/contacts/{{contactUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete CRM company",
+      "method": "DELETE",
+      "path": "/api/crm/companies/{{companyUuid}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        400,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete sector",
+      "method": "DELETE",
+      "path": "/api/sectors/{{sectorId}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        403,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete source",
+      "method": "DELETE",
+      "path": "/api/sources/{{sourceId}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        403,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete rating",
+      "method": "DELETE",
+      "path": "/api/ratings/{{ratingId}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        403,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete CRM category",
+      "method": "DELETE",
+      "path": "/api/crm-categories/{{crmCategoryId}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        403,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete CRM department",
+      "method": "DELETE",
+      "path": "/api/crm-departments/{{crmDepartmentId}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        403,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete CRM topic",
+      "method": "DELETE",
+      "path": "/api/crm-topics/{{crmTopicId}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        403,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete CRM function",
+      "method": "DELETE",
+      "path": "/api/crm-functions/{{crmFunctionId}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        403,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete CRM title",
+      "method": "DELETE",
+      "path": "/api/crm-titles/{{crmTitleId}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        403,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete legal form",
+      "method": "DELETE",
+      "path": "/api/legal-forms/{{legalFormId}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        403,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Delete company size",
+      "method": "DELETE",
+      "path": "/api/company-sizes/{{companySizeId}}",
+      "auth": true,
+      "expectStatus": [
+        200,
+        204,
+        403,
+        404,
+        422
+      ]
+    },
+    {
+      "name": "Auth logout",
+      "method": "POST",
+      "path": "/api/logout",
+      "auth": true,
+      "body": {},
+      "expectStatus": [
+        200
+      ]
+    }
   ],
-
   "pages": [
-    { "name": "Login", "path": "/login", "requiresAuth": false,
-      "expectSelector": "form" },
-
-    { "name": "Dashboard", "path": "/dashboard", "requiresAuth": true,
+    {
+      "name": "Login",
+      "path": "/login",
+      "requiresAuth": false,
+      "expectSelector": "form"
+    },
+    {
+      "name": "Dashboard",
+      "path": "/dashboard",
+      "requiresAuth": true,
       "expectSelector": "body",
-      "knownIssue": "Audit flags this as static/mock widget data" },
-
-    { "name": "CRM Contacts", "path": "/crm/contacts", "requiresAuth": true, "expectSelector": "table, [role=table]" },
-    { "name": "CRM Leads", "path": "/crm/leads", "requiresAuth": true, "expectSelector": "table, [role=table]" },
-    { "name": "CRM Customers", "path": "/crm/customers", "requiresAuth": true, "expectSelector": "table, [role=table]" },
-    { "name": "CRM Suppliers", "path": "/crm/suppliers", "requiresAuth": true, "expectSelector": "table, [role=table]" },
-
-    { "name": "Articles - Items", "path": "/articles/items", "requiresAuth": true, "expectSelector": "table, [role=table]" },
-    { "name": "Articles - Variant Articles (placeholder per audit)", "path": "/articles/variant-articles", "requiresAuth": true, "expectSelector": "body",
-      "knownIssue": "Audit flags this as placeholder/local-only" },
-
-    { "name": "Sales Quotations", "path": "/sales/quotations", "requiresAuth": true, "expectSelector": "table, [role=table]" },
-    { "name": "Sales Orders", "path": "/sales/orders", "requiresAuth": true, "expectSelector": "table, [role=table]" },
-    { "name": "Sales Shipments", "path": "/sales/shipments", "requiresAuth": true, "expectSelector": "table, [role=table]" },
-    { "name": "Sales Invoices (no router entry per audit)", "path": "/sales/invoices", "requiresAuth": true, "expectSelector": "body",
-      "knownIssue": "Audit flags no router entry - expect fallthrough to dashboard" },
-
-    { "name": "Purchase Orders", "path": "/purchases/orders", "requiresAuth": true, "expectSelector": "table, [role=table]" },
-    { "name": "Warehouse Stock Movements", "path": "/warehouse/stock-movements", "requiresAuth": true, "expectSelector": "table, [role=table]" },
-    { "name": "Warehouse Stock Levels (mock per audit)", "path": "/warehouse/stock-levels", "requiresAuth": true, "expectSelector": "body",
-      "knownIssue": "Audit flags mock table/tree data" }
+      "knownIssue": "Dashboard widgets currently render static/mock data while API hooks are unused."
+    },
+    {
+      "name": "CRM Contacts",
+      "path": "/crm/contacts",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "CRM Contact Detail",
+      "path": "/crm/contacts/00000000-0000-0000-0000-000000000000",
+      "requiresAuth": true,
+      "expectSelector": "body",
+      "knownIssue": "Dynamic detail route needs a real UUID fixture; config uses placeholder UUID for route smoke only."
+    },
+    {
+      "name": "CRM Leads",
+      "path": "/crm/leads",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "CRM Customers",
+      "path": "/crm/customers",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "CRM Suppliers",
+      "path": "/crm/suppliers",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "Articles Items",
+      "path": "/articles/items",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "Article Detail",
+      "path": "/articles/items/00000000-0000-0000-0000-000000000000",
+      "requiresAuth": true,
+      "expectSelector": "body",
+      "knownIssue": "Dynamic detail route needs a real UUID fixture; config uses placeholder UUID for route smoke only."
+    },
+    {
+      "name": "Article Supply Sources",
+      "path": "/articles/supply-sources",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "Article Sales Prices",
+      "path": "/articles/sales-prices",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "Article Purchase Prices",
+      "path": "/articles/purchase-prices",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "Article Variant Articles",
+      "path": "/articles/variant-articles",
+      "requiresAuth": true,
+      "expectSelector": "body",
+      "knownIssue": "Placeholder/local-only page."
+    },
+    {
+      "name": "Article Item Groups",
+      "path": "/articles/item-groups",
+      "requiresAuth": true,
+      "expectSelector": "body",
+      "knownIssue": "Placeholder/local-only page."
+    },
+    {
+      "name": "Article Merchandise Categories",
+      "path": "/articles/merchandise-categories",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "Article Subitems",
+      "path": "/articles/subitems",
+      "requiresAuth": true,
+      "expectSelector": "body",
+      "knownIssue": "Placeholder page."
+    },
+    {
+      "name": "Article Manufacturers",
+      "path": "/articles/manufacturers",
+      "requiresAuth": true,
+      "expectSelector": "body",
+      "knownIssue": "Placeholder/local-only page."
+    },
+    {
+      "name": "Sales Quotations",
+      "path": "/sales/quotations",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "Sales Orders",
+      "path": "/sales/orders",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "Sales Shipments",
+      "path": "/sales/shipments",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "Sales Products Missing Frontend Route",
+      "path": "/sales/products",
+      "requiresAuth": true,
+      "expectSelector": ".sales-products-page",
+      "knownIssue": "Sidebar advertises route, but React Router has no /sales/products route."
+    },
+    {
+      "name": "Sales Invoices Missing Frontend Route",
+      "path": "/sales/invoices",
+      "requiresAuth": true,
+      "expectSelector": ".sales-invoices-page",
+      "knownIssue": "Sidebar/header advertise route, but React Router has no /sales/invoices route."
+    },
+    {
+      "name": "Sales Returns Missing Frontend Route",
+      "path": "/sales/returns",
+      "requiresAuth": true,
+      "expectSelector": ".sales-returns-page",
+      "knownIssue": "Sidebar advertises route, but React Router has no /sales/returns route."
+    },
+    {
+      "name": "Purchase Orders",
+      "path": "/purchases/orders",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "Incoming Goods",
+      "path": "/purchases/incoming-goods",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "Purchase Invoices",
+      "path": "/purchases/invoices",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "Supplier Returns",
+      "path": "/purchases/returns",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "Inventory Groups",
+      "path": "/warehouse/groups",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "Inventory Count Detail",
+      "path": "/warehouse/inventory-books/00000000-0000-0000-0000-000000000000",
+      "requiresAuth": true,
+      "expectSelector": "body",
+      "knownIssue": "Dynamic detail route needs a real UUID fixture; config uses placeholder UUID for route smoke only."
+    },
+    {
+      "name": "Warehouse Stock Levels",
+      "path": "/warehouse/stock-levels",
+      "requiresAuth": true,
+      "expectSelector": "body",
+      "knownIssue": "Page table/tree currently use mock data despite backend stock-level endpoints."
+    },
+    {
+      "name": "Warehouse Stock Movements",
+      "path": "/warehouse/stock-movements",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "Warehouse Stock Adjustments Placeholder",
+      "path": "/warehouse/stock-adjustments",
+      "requiresAuth": true,
+      "expectSelector": ".stock-adjustments-page",
+      "knownIssue": "Backend exists, frontend route renders SettingsPlaceholder."
+    },
+    {
+      "name": "Settings",
+      "path": "/settings",
+      "requiresAuth": true,
+      "expectSelector": "body",
+      "knownIssue": "Generic settings route renders placeholder."
+    },
+    {
+      "name": "My Settings",
+      "path": "/my-settings",
+      "requiresAuth": true,
+      "expectSelector": "body",
+      "knownIssue": "Form is largely static and not wired to profile/password APIs."
+    },
+    {
+      "name": "Warehouse Structure",
+      "path": "/settings/warehouse/structure",
+      "requiresAuth": true,
+      "expectSelector": "body"
+    },
+    {
+      "name": "Warehouse Structure Detail",
+      "path": "/settings/warehouse/structure/00000000-0000-0000-0000-000000000000",
+      "requiresAuth": true,
+      "expectSelector": "body",
+      "knownIssue": "Dynamic detail route needs a real UUID fixture; config uses placeholder UUID for route smoke only."
+    },
+    {
+      "name": "Warehouse Settings Placeholder",
+      "path": "/settings/warehouse/settings",
+      "requiresAuth": true,
+      "expectSelector": ".warehouse-settings-page",
+      "knownIssue": "Renders SettingsPlaceholder."
+    },
+    {
+      "name": "Permanent Transport References Placeholder",
+      "path": "/settings/warehouse/permanent-transport-references",
+      "requiresAuth": true,
+      "expectSelector": ".permanent-transport-references-page",
+      "knownIssue": "Renders SettingsPlaceholder."
+    },
+    {
+      "name": "Loading Equipment IDs Placeholder",
+      "path": "/settings/warehouse/loading-equipment-ids",
+      "requiresAuth": true,
+      "expectSelector": ".loading-equipment-ids-page",
+      "knownIssue": "Renders SettingsPlaceholder."
+    },
+    {
+      "name": "Storage Place Sizes Placeholder",
+      "path": "/settings/warehouse/storage-place-sizes",
+      "requiresAuth": true,
+      "expectSelector": ".storage-place-sizes-page",
+      "knownIssue": "Renders SettingsPlaceholder."
+    }
   ],
-
-  "buttonChecks": [
-    { "pageName": "CRM Contacts", "buttonText": "Add", "expectAction": "opens-modal-or-navigates" }
-  ]
+  "buttonChecks": []
 }

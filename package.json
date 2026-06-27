@@ -8,6 +8,7 @@
     "test:api": "playwright test api-tests",
     "test:ui": "playwright test ui-tests",
     "test:project": "node core/run.js",
+    "cleanup": "node core/cleanupCli.js",
     "report": "playwright show-report reports/html"
   },
   "devDependencies": {
