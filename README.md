@@ -2,9 +2,13 @@
 
 A config-driven, plugin-based QA automation framework for validating entire ERP systems before production deployment. Point it at any project with a single JSON config — no project-specific test code required.
 
+## Run tests
+
 ```bash
-PROJECT=my-erp npx playwright test
+PROJECT=anil-erp npx playwright test
 ```
+
+Requires the app backend and frontend running locally, plus a QA user in the database (see your project config under `configs/`).
 
 ## Capabilities
 
@@ -43,23 +47,10 @@ PROJECT=my-erp npx playwright test
 ```bash
 npm install
 npx playwright install --with-deps chromium
-
-# Run full suite
 PROJECT=anil-erp npx playwright test
-
-# Run specific plugins
-PLUGINS=api,ui,workflows PROJECT=anil-erp npx playwright test
-
-# Run smoke-tagged tests only
-TAGS=smoke PROJECT=anil-erp npx playwright test
-
-# All browsers
-BROWSERS=chromium,firefox,webkit PROJECT=anil-erp npm run test:all-browsers
-
-# View reports
-npm run report          # Playwright HTML report
-npm run report:qa       # Custom QA report with perf/a11y warnings
 ```
+
+Reports after a run: `npm run report` (Playwright HTML) · `npm run report:qa` (QA summary)
 
 ## Architecture
 
@@ -112,7 +103,7 @@ Or via environment: `PLUGINS=api,ui,workflows`
 5. Add `workflows[]` for CRUD flows
 6. Add other sections as needed
 
-Run: `PROJECT=my-erp npx playwright test`
+Set `PROJECT` to your config filename (without `.json`) and run the suite (see **Run tests** above).
 
 ## Config Reference
 

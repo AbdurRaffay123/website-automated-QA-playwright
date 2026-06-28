@@ -24,10 +24,12 @@ const browserProjects = browsers.map((browser) => ({
   },
 }));
 
+// Canonical entry: tests/suite.spec.js (plugin-based unified runner).
+// Legacy api-tests/ and ui-tests/ are excluded; pass them explicitly on the CLI
+// (e.g. npm run test:api) if you still need the old entry points.
 export default defineConfig({
   testDir: '.',
-  // Default: full suite. Use `playwright test api-tests` or `ui-tests` for filtered runs.
-  testMatch: ['tests/**/*.spec.js', 'api-tests/**/*.spec.js', 'ui-tests/**/*.spec.js'],
+  testMatch: ['tests/**/*.spec.js'],
   timeout: projectConfig.timeout || 60_000,
   expect: {
     timeout: 10_000,
